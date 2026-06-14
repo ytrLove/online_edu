@@ -1,0 +1,143 @@
+/* 现代化配色方案 */
+:root {
+  /* 基础色彩 */
+  --vt-c-white: #ffffff;
+  --vt-c-white-soft: #fafbfc;
+  --vt-c-white-mute: #f5f7fa;
+
+  --vt-c-black: #1a1a1a;
+  --vt-c-black-soft: #262626;
+  --vt-c-black-mute: #333333;
+
+  /* 主题色 */
+  --vt-c-primary: #667eea;
+  --vt-c-primary-light: #764ba2;
+  --vt-c-primary-dark: #4c63d2;
+  
+  /* 渐变色 */
+  --vt-gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --vt-gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --vt-gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --vt-gradient-warning: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  
+  /* 分割线 */
+  --vt-c-divider-light-1: rgba(60, 60, 60, 0.12);
+  --vt-c-divider-light-2: rgba(60, 60, 60, 0.06);
+  --vt-c-divider-dark-1: rgba(200, 200, 200, 0.25);
+  --vt-c-divider-dark-2: rgba(200, 200, 200, 0.15);
+
+  /* 文本颜色 */
+  --vt-c-text-light-1: #2c3e50;
+  --vt-c-text-light-2: rgba(60, 60, 60, 0.7);
+  --vt-c-text-light-3: rgba(60, 60, 60, 0.5);
+  --vt-c-text-dark-1: var(--vt-c-white);
+  --vt-c-text-dark-2: rgba(235, 235, 235, 0.8);
+  --vt-c-text-dark-3: rgba(235, 235, 235, 0.6);
+  
+  /* 阴影 */
+  --vt-shadow-1: 0 2px 12px 0 rgba(0, 0, 0, 0.04);
+  --vt-shadow-2: 0 4px 16px 0 rgba(0, 0, 0, 0.08);
+  --vt-shadow-3: 0 8px 24px 0 rgba(0, 0, 0, 0.12);
+  --vt-shadow-4: 0 16px 48px 0 rgba(0, 0, 0, 0.16);
+  
+  /* 圆角 */
+  --vt-radius-small: 6px;
+  --vt-radius-medium: 12px;
+  --vt-radius-large: 18px;
+  --vt-radius-xl: 24px;
+  
+  /* 动画时间 */
+  --vt-transition-fast: 0.2s;
+  --vt-transition-medium: 0.3s;
+  --vt-transition-slow: 0.5s;
+}
+
+/* 语义化颜色变量 */
+:root {
+  /* 背景色 */
+  --color-background: var(--vt-c-white);
+  --color-background-soft: var(--vt-c-white-soft);
+  --color-background-mute: var(--vt-c-white-mute);
+  --color-background-overlay: rgba(255, 255, 255, 0.9);
+
+  /* 边框色 */
+  --color-border: var(--vt-c-divider-light-2);
+  --color-border-hover: var(--vt-c-divider-light-1);
+
+  /* 文本色 */
+  --color-heading: var(--vt-c-text-light-1);
+  --color-text: var(--vt-c-text-light-1);
+  --color-text-secondary: var(--vt-c-text-light-2);
+  --color-text-tertiary: var(--vt-c-text-light-3);
+  
+  /* 主题色 */
+  --color-primary: var(--vt-c-primary);
+  --color-primary-light: var(--vt-c-primary-light);
+  --color-primary-dark: var(--vt-c-primary-dark);
+  
+  /* 功能色 */
+  --color-success: #52c41a;
+  --color-warning: #faad14;
+  --color-error: #ff4d4f;
+  --color-info: #1890ff;
+
+  /* 间距 */
+  --section-gap: 120px;
+  --content-gap: 24px;
+  --item-gap: 16px;
+  
+  /* 容器 */
+  --container-max-width: 1200px;
+  --container-padding: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--vt-c-black);
+    --color-background-soft: var(--vt-c-black-soft);
+    --color-background-mute: var(--vt-c-black-mute);
+
+    --color-border: var(--vt-c-divider-dark-2);
+    --color-border-hover: var(--vt-c-divider-dark-1);
+
+    --color-heading: var(--vt-c-text-dark-1);
+    --color-text: var(--vt-c-text-dark-2);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  font-weight: normal;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--color-text);
+  background: var(--color-background);
+  transition:
+    color var(--vt-transition-medium),
+    background-color var(--vt-transition-medium);
+  line-height: 1.6;
+  font-family:
+    'Inter',
+    'PingFang SC',
+    'Microsoft YaHei',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Helvetica Neue',
+    sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}

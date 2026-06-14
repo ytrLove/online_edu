@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.mapper.ExamAssignmentQuestionMapper">
+
+    <resultMap id="AssignmentQuestionResultMap" type="com.exam.model.entity.ExamAssignmentQuestion">
+        <id property="id" column="id"/>
+        <result property="assignmentId" column="assignment_id"/>
+        <result property="questionId" column="question_id"/>
+        <result property="questionOrder" column="question_order"/>
+        <result property="points" column="points"/>
+    </resultMap>
+    
+    <insert id="batchInsert">
+        insert into exam_assignment_question (assignment_id, question_id, question_order, points)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.assignmentId}, #{item.questionId}, #{item.questionOrder}, #{item.points})
+        </foreach>
+    </insert>
+    
+    <insert id="insertBatch">
+        insert into exam_assignment_question (assignment_id, question_id, question_order, points)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.assignmentId}, #{item.questionId}, #{item.questionOrder}, #{item.points})
+        </foreach>
+    </insert>
+    
+    <delete id="deleteByAssignmentId">
+        delete from exam_assignment_question
+        where assignment_id = #{assignmentId}
+    </delete>
+    
+    <delete id="deleteByAssignmentIdAndQuestionId">
+        delete from exam_assignment_question
+        where assignment_id = #{assignmentId} and question_id = #{questionId}
+    </delete>
+    
+    <select id="selectQuestionIdsByAssignmentId" resultType="java.lang.Long">
+        select question_id
+        from exam_assignment_question
+        where assignment_id = #{assignmentId}
+        order by question_order
+    </select>
+    
+    <select id="selectQuestionsByAssignmentId" resultMap="com.exam.mapper.ExamQuestionBankMapper.QuestionResultMap">
+        select q.question_id, q.question_type_id, q.question_content, q.options, q.correct_answer,
+               q.explanation, q.difficulty, q.course_id, q.teacher_id, q.status, q.del_flag,
+               q.create_time, q.update_time,
+               t.type_name, c.course_name, u.username as teacher_name,
+               aq.question_order, aq.points
+        from exam_assignment_question aq
+        inner join exam_question_bank q on aq.question_id = q.question_id
+        left join exam_question_type t on q.question_type_id = t.type_id
+        left join edu_course c on q.course_id = c.course_id
+        left join edu_teacher e on q.teacher_id = e.teacher_id
+        left join sys_user u on e.user_id = u.user_id
+        where aq.assignment_id = #{assignmentId} and q.del_flag = 0
+        order by aq.question_order
+    </select>
+    
+</mapper> 

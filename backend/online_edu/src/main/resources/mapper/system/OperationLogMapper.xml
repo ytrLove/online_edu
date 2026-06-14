@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.user.mapper.OperationLogMapper">
+
+    <!-- 常见问题区域 -->
+    <select id="selectModules" resultType="com.user.model.entity.OperationLog">
+        SELECT * FROM sys_operation_logs
+        <where>
+            <!-- 检查这里的条件语句 -->
+            <if test="username != null and username != ''">
+                AND oper_name LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <!-- 特别注意 & 符号必须转义为 &amp; -->
+            <if test="status != null">
+                AND status = #{status} <!-- 正确转义 -->
+            </if>
+
+        </where>
+        ORDER BY created_at DESC
+    </select>
+</mapper>

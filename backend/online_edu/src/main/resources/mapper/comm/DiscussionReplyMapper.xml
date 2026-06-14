@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.comm.mapper.DiscussionReplyMapper">
+
+    <resultMap id="ReplyResultMap" type="com.comm.entity.DiscussionReply">
+        <id property="replyId" column="reply_id"/>
+        <result property="topicId" column="topic_id"/>
+        <result property="content" column="content"/>
+        <result property="userId" column="user_id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="username" column="username"/>
+        <result property="avatar" column="avatar"/>
+    </resultMap>
+    
+    <select id="selectReplyList" resultMap="ReplyResultMap">
+        SELECT
+            r.reply_id,
+            r.topic_id,
+            r.content,
+            r.user_id,
+            r.parent_id,
+            r.create_time,
+            u.username,
+            u.avatar
+        FROM
+            comm_discussion_reply r
+        LEFT JOIN
+            sys_user u ON r.user_id = u.user_id
+        <where>
+            r.del_flag = 0
+            AND r.topic_id = #{topicId}
+            <if test="parentId != null">
+                AND r.parent_id = #{parentId}
+            </if>
+            <if test="parentId == null">
+                AND r.parent_id IS NULL
+            </if>
+        </where>
+        ORDER BY r.create_time ASC
+    </select>
+    
+    <select id="selectChildReplies" resultMap="ReplyResultMap">
+        SELECT
+            r.reply_id,
+            r.topic_id,
+            r.content,
+            r.user_id,
+            r.parent_id,
+            r.create_time,
+            u.username,
+            u.avatar
+        FROM
+            comm_discussion_reply r
+        LEFT JOIN
+            sys_user u ON r.user_id = u.user_id
+        WHERE
+            r.del_flag = 0
+            AND r.parent_id = #{parentId}
+        ORDER BY r.create_time ASC
+    </select>
+    
+</mapper> 

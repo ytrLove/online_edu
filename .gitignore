@@ -1,0 +1,34 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Backend dependencies
+backend/online_edu/.mvn/wrapper/maven-wrapper.jar
+backend/online_edu/target/
+backend/online_edu/.settings/
+backend/online_edu/bin/
+backend/online_edu/.classpath
+backend/online_edu/.project
+
+# Frontend dependencies
+frontend/admin/node_modules/
+frontend/user/node_modules/
+frontend/admin/dist/
+frontend/user/dist/
+
+# Environment files (sensitive)
+.env
+.env.local
+.env.*.local
+
+# Docker volumes
+mysql-data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

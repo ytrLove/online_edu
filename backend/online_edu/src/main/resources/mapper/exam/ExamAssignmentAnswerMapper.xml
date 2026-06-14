@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.mapper.ExamAssignmentAnswerMapper">
+
+    <resultMap id="AnswerResultMap" type="com.exam.model.entity.ExamAssignmentAnswer">
+        <id property="answerId" column="answer_id"/>
+        <result property="submissionId" column="submission_id"/>
+        <result property="questionId" column="question_id"/>
+        <result property="studentAnswer" column="student_answer"/>
+        <result property="score" column="score"/>
+        <result property="feedback" column="feedback"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="questionContent" column="question_content"/>
+        <result property="correctAnswer" column="correct_answer"/>
+        <result property="points" column="points"/>
+        <result property="typeName" column="type_name"/>
+    </resultMap>
+
+    <insert id="batchInsert">
+        insert into exam_assignment_answer (submission_id, question_id, student_answer, score, feedback, create_time)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.submissionId}, #{item.questionId}, #{item.studentAnswer}, #{item.score}, 
+            #{item.feedback}, now())
+        </foreach>
+    </insert>
+
+    <update id="batchUpdateScore">
+        update exam_assignment_answer
+        set score = CASE
+            <foreach collection="list" item="item">
+                WHEN submission_id = #{item.submissionId} AND question_id = #{item.questionId} THEN #{item.score}
+            </foreach>
+            ELSE score
+            END,
+            feedback = CASE
+            <foreach collection="list" item="item">
+                WHEN submission_id = #{item.submissionId} AND question_id = #{item.questionId} THEN #{item.feedback}
+            </foreach>
+            ELSE feedback
+            END,
+            update_time = now()
+        where (submission_id, question_id) in
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.submissionId}, #{item.questionId})
+        </foreach>
+    </update>
+
+    <select id="selectAnswersBySubmissionId" resultMap="AnswerResultMap">
+        select a.submission_id, a.question_id, a.student_answer, a.score, a.feedback, 
+               a.create_time, a.update_time,
+               q.question_content, q.correct_answer, q.options,
+               t.type_name, t.is_auto_graded,
+               aq.points
+        from exam_assignment_answer a
+        inner join exam_question_bank q on a.question_id = q.question_id
+        left join exam_question_type t on q.question_type_id = t.type_id
+        left join exam_assignment_submission s on a.submission_id = s.submission_id
+        left join exam_assignment_question aq on aq.assignment_id = s.assignment_id and aq.question_id = a.question_id
+        where a.submission_id = #{submissionId}
+        order by aq.question_order
+    </select>
+
+</mapper> 

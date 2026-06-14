@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.mapper.ExamPaperQuestionMapper">
+
+    <!-- 试卷题目关联的结果映射，描述了试卷与题目的关联实体 -->
+    <resultMap id="PaperQuestionResultMap" type="com.exam.model.entity.ExamPaperQuestion">
+        <!-- 主键映射 -->
+        <id property="id" column="id"/>
+        <!-- 关联字段映射 -->
+        <result property="examId" column="exam_id"/>
+        <result property="questionId" column="question_id"/>
+        <!-- 其他属性映射 -->
+        <result property="questionOrder" column="question_order"/>
+        <result property="points" column="points"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+    
+    <!-- 题目实体结果映射，描述题目的各个属性 -->
+    <resultMap id="QuestionResultMap" type="com.exam.model.entity.ExamQuestionBank">
+        <!-- 主键映射 -->
+        <id property="questionId" column="question_id"/>
+        <!-- 题目基本信息映射 -->
+        <result property="questionTypeId" column="question_type_id"/>
+        <result property="typeName" column="type_name"/>
+        <result property="difficulty" column="difficulty"/>
+        <result property="questionContent" column="question_content"/>
+        <result property="options" column="options"/>
+        <result property="correctAnswer" column="correct_answer"/>
+        <result property="explanation" column="explanation"/>
+    </resultMap>
+    
+    <!-- 批量插入试卷题目关联数据 -->
+    <insert id="batchInsert">
+        insert into exam_paper_question (exam_id, question_id, question_order, points, create_time)
+        values
+        <!-- 循环遍历题目集合，逐个插入 -->
+        <foreach collection="list" item="item" separator=",">
+            (#{item.examId}, #{item.questionId}, #{item.questionOrder}, #{item.points}, now())
+        </foreach>
+    </insert>
+    
+    <!-- 根据试卷ID查询关联的题目列表 -->
+    <select id="selectQuestionsByExamId" resultMap="QuestionResultMap">
+        <!-- 查询试卷下的所有题目及其详细信息 -->
+        SELECT 
+            q.question_id,                         <!-- 题目ID -->
+            q.question_type_id as type_id,         <!-- 题目类型ID -->
+            t.type_name,                           <!-- 题目类型名称 -->
+            q.difficulty,                          <!-- 题目难度 -->
+            q.question_content,                    <!-- 题目内容 -->
+            q.options,                             <!-- 选项内容 -->
+            q.correct_answer,                      <!-- 正确答案 -->
+            q.explanation,                         <!-- 解析说明 -->
+            pq.question_order                      <!-- 题目排序 -->
+        FROM exam_paper_question pq
+        JOIN exam_question_bank q ON pq.question_id = q.question_id
+        JOIN exam_question_type t ON q.question_type_id = t.type_id
+        WHERE pq.exam_id = #{examId} AND q.del_flag = 0    <!-- 筛选条件：试卷ID和有效标记 -->
+        ORDER BY pq.question_order ASC                     <!-- 按题目顺序排序 -->
+    </select>
+    
+    <!-- 根据试卷ID删除所有关联的题目 -->
+    <delete id="deleteByExamId">
+        delete from exam_paper_question where exam_id = #{examId}
+    </delete>
+    
+</mapper> 

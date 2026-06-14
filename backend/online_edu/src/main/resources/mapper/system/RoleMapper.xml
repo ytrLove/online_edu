@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.user.mapper.RoleMapper">
+    
+    <!-- 根据用户ID查询角色列表（包含菜单信息） -->
+    <select id="selectRolesByUserIdWithMenus" resultMap="RoleWithMenusResult">
+        SELECT DISTINCT r.*, m.menu_id, m.menu_name, m.perms
+        FROM sys_role r 
+        INNER JOIN sys_user_role ur ON r.role_id = ur.role_id
+        LEFT JOIN sys_role_menu rm ON r.role_id = rm.role_id
+        LEFT JOIN sys_menu m ON rm.menu_id = m.menu_id
+        WHERE ur.user_id = #{userId} AND r.status = 1 AND r.del_flag = 0
+    </select>
+    
+    <!-- 角色信息结果映射，包含菜单信息 -->
+    <resultMap id="RoleWithMenusResult" type="com.user.model.entity.SysRole">
+        <id property="roleId" column="role_id"/>
+        <result property="roleName" column="role_name"/>
+        <result property="roleKey" column="role_key"/>
+        <result property="roleSort" column="role_sort"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+        <collection property="menus" ofType="com.user.model.entity.SysMenu">
+            <id property="menuId" column="menu_id"/>
+            <result property="menuName" column="menu_name"/>
+            <result property="perms" column="perms"/>
+        </collection>
+    </resultMap>
+    
+    <!-- 根据用户ID查询角色列表 -->
+    <select id="selectRolesByUserId" resultType="com.user.model.entity.SysRole">
+        SELECT r.* FROM sys_role r
+        INNER JOIN sys_user_role ur ON r.role_id = ur.role_id
+        WHERE ur.user_id = #{userId} AND r.status = 1 AND r.del_flag = 0
+    </select>
+    
+    <!-- 根据角色ID查询角色信息，包含菜单信息 -->
+    <select id="selectRoleWithMenus" resultMap="RoleWithMenusResult">
+        SELECT r.*, m.menu_id, m.menu_name, m.perms
+        FROM sys_role r
+        LEFT JOIN sys_role_menu rm ON r.role_id = rm.role_id
+        LEFT JOIN sys_menu m ON rm.menu_id = m.menu_id
+        WHERE r.role_id = #{roleId}
+    </select>
+    
+    <!-- 删除角色权限关联 -->
+    <delete id="deleteRolePermissions">
+        DELETE FROM sys_role_permission WHERE role_id = #{roleId}
+    </delete>
+    
+    <!-- 批量插入角色权限关联 -->
+    <insert id="insertRolePermissions">
+        INSERT INTO sys_role_permission(role_id, perm_id) VALUES
+        <foreach collection="permissionIds" item="permissionId" separator=",">
+            (#{roleId}, #{permissionId})
+        </foreach>
+    </insert>
+    
+    <!-- 删除用户角色关联 -->
+    <delete id="deleteUserRolesByRoleId">
+        DELETE FROM sys_user_role WHERE role_id = #{roleId}
+    </delete>
+    
+    <!-- 删除角色菜单关联 -->
+    <delete id="deleteRoleMenusByRoleId">
+        DELETE FROM sys_role_menu WHERE role_id = #{roleId}
+    </delete>
+</mapper> 

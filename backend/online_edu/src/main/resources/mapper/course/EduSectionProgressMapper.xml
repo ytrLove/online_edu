@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.course.mapper.EduSectionProgressMapper">
+
+    <resultMap id="ProgressResultMap" type="com.course.model.entity.EduSectionProgress">
+        <id column="progress_id" property="progressId"/>
+        <result column="student_id" property="studentId"/>
+        <result column="section_id" property="sectionId"/>
+        <result column="progress" property="progress"/>
+        <result column="completion_status" property="completionStatus"/>
+        <result column="last_position" property="lastPosition"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="student_name" property="studentName"/>
+        <result column="section_title" property="sectionTitle"/>
+    </resultMap>
+
+    <sql id="selectProgressVo">
+        select p.progress_id, p.student_id, p.section_id, p.progress, p.completion_status, p.last_position, 
+               p.create_time, p.update_time, 
+               su.nickname as student_name, s.title as section_title
+        from edu_section_progress p
+        left join edu_section s on p.section_id = s.section_id
+        left join edu_student es on p.student_id = es.student_id
+        left join sys_user su on es.user_id = su.user_id
+    </sql>
+
+    <select id="selectByStudentAndSection" resultMap="ProgressResultMap">
+        <include refid="selectProgressVo"/>
+        where p.student_id = #{studentId} and p.section_id = #{sectionId}
+    </select>
+
+    <select id="selectByCourseAndStudent" resultMap="ProgressResultMap">
+        <include refid="selectProgressVo"/>
+        left join edu_chapter c on s.chapter_id = c.chapter_id
+        where p.student_id = #{studentId} and c.course_id = #{courseId}
+        order by c.sort, s.sort
+    </select>
+
+    <select id="calculateCourseProgress" resultType="Integer">
+        select IFNULL(sum(p.progress) / count(*), 0) as course_progress
+        from edu_section_progress p
+        inner join edu_section s on p.section_id = s.section_id
+        inner join edu_chapter c on s.chapter_id = c.chapter_id
+        where p.student_id = #{studentId} and c.course_id = #{courseId}
+    </select>
+</mapper> 

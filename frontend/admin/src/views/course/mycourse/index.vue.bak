@@ -1,0 +1,2676 @@
+<template>
+  <div class="mycourse-container">
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>我的课程</span>
+        </div>
+      </template>
+      
+      <!-- 搜索区域 -->
+      <el-form :model="queryParams" ref="queryForm" :inline="true" class="search-form">
+        <el-form-item label="课程名称">
+          <el-input v-model="queryParams.courseName" placeholder="请输入课程名称" clearable @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
+            <el-option label="进行中" value="published" />
+            <el-option label="草稿" value="draft" />
+            <el-option label="结束" value="closed" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleQuery">
+            <el-icon><Search /></el-icon>搜索
+          </el-button>
+          <el-button @click="resetQuery">
+            <el-icon><Refresh /></el-icon>重置
+          </el-button>
+        </el-form-item>
+      </el-form>
+      
+      <!-- 课程卡片展示区域 -->
+      <div v-loading="loading" class="course-list">
+        <el-empty v-if="courseList.length === 0" description="暂无课程" />
+        <el-row :gutter="20">
+          <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="course in courseList" :key="course.courseId">
+            <el-card class="course-card" shadow="hover">
+              <div class="course-cover">
+                <el-image 
+                  :src="course.coverImage || defaultCover" 
+                  fit="cover"
+                  :preview-src-list="[course.coverImage || defaultCover]"
+                >
+                  <template #error>
+                    <div class="image-placeholder">
+                      <el-icon><Picture /></el-icon>
+                    </div>
+                  </template>
+                </el-image>
+                <div class="course-status">
+                  <el-tag :type="getStatusTag(course.status)" size="small">
+                    {{ getStatusLabel(course.status) }}
+                  </el-tag>
+                </div>
+              </div>
+              <div class="course-info">
+                <h3 class="course-name">{{ course.courseName }}</h3>
+                <div class="course-meta">
+                  <span>学生数: {{ course.studentCount || 0 }}</span>
+                  <span>{{ formatDate(course.startTime) }} ~ {{ formatDate(course.endTime) }}</span>
+                </div>
+                <div class="course-desc">{{ course.description || '暂无描述' }}</div>
+              </div>
+              <div class="course-actions">
+                <el-button type="primary" @click="openCourseDetail(course)">
+                  课程管理
+                </el-button>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
+      
+      <!-- 分页区域 -->
+      <div class="pagination-container">
+        <el-pagination
+          :current-page="queryParams.pageNum"
+          :page-size="queryParams.pageSize"
+          :page-sizes="[8, 12, 24, 36]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </el-card>
+
+    <!-- 课程详情对话框 -->
+    <el-dialog 
+      v-model="detailDialogVisible" 
+      :title="currentCourse.courseName || '课程详情'" 
+      width="80%" 
+      :before-close="handleCloseDialog"
+      class="course-detail-dialog"
+    >
+      <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+        <el-tab-pane label="课程信息" name="info">
+          <div class="course-detail-info">
+            <div class="detail-item">
+              <h4>课程名称：</h4>
+              <p>{{ currentCourse.courseName }}</p>
+            </div>
+            <div class="detail-item">
+              <h4>课程描述：</h4>
+              <p>{{ currentCourse.description || '暂无描述' }}</p>
+            </div>
+            <div class="detail-item">
+              <h4>开始时间：</h4>
+              <p>{{ formatDate(currentCourse.enrollmentStartTime) }}</p>
+            </div>
+            <div class="detail-item">
+              <h4>结束时间：</h4>
+              <p>{{ formatDate(currentCourse.enrollmentEndTime) }}</p>
+            </div>
+            <div class="detail-item">
+              <h4>学生数量：</h4>
+              <p>{{ currentCourse.studentCount || 0 }}</p>
+            </div>
+            <div class="detail-item">
+              <h4>课程状态：</h4>
+              <p>
+                <el-tag :type="getStatusTag(currentCourse.status)">
+                  {{ getStatusLabel(currentCourse.status) }}
+                </el-tag>
+              </p>
+            </div>
+          </div>
+        </el-tab-pane>
+        
+        <el-tab-pane label="资源管理" name="resource">
+          <div class="tab-container">
+            <!-- 资源管理组件 -->
+            <div class="resource-section">
+              <div class="section-header">
+                <h3>课程资源列表</h3>
+                <el-button type="primary" @click="openCreateResourceDialog">上传资源</el-button>
+              </div>
+              <el-table :data="resourceList" border stripe style="width: 100%">
+                <el-table-column prop="resourceName" label="资源名称" min-width="150"></el-table-column>
+                <el-table-column prop="resourceType" label="资源类型" width="120">
+                  <template #default="scope">
+                    <el-tag :type="getResourceTypeTag(scope.row.resourceType)">
+                      {{ getResourceTypeLabel(scope.row.resourceType) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="fileSize" label="文件大小" width="120">
+                  <template #default="scope">
+                    {{ formatFileSize(scope.row.fileSize) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="createTime" label="上传时间" width="180"></el-table-column>
+                <el-table-column prop="downloadCount" label="下载次数" width="100"></el-table-column>
+                <el-table-column label="操作" width="250">
+                  <template #default="scope">
+                    <el-button size="small" type="primary" @click="handleDownloadResource(scope.row)">下载</el-button>
+                    <el-button size="small" type="info" @click="handlePreviewResource(scope.row)">预览</el-button>
+                    <el-button size="small" type="warning" @click="handleEditResource(scope.row)">编辑</el-button>
+                    <el-button size="small" type="danger" @click="handleDeleteResource(scope.row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+        </el-tab-pane>
+        
+        <el-tab-pane label="题库管理" name="question">
+          <div class="tab-container">
+            <!-- 题库管理组件 -->
+            <div class="question-section">
+              <div class="section-header">
+                <h3>课程题库列表</h3>
+                <el-button type="primary" @click="handleQuestionAction">添加试题</el-button>
+              </div>
+              <el-form :inline="true" :model="questionQueryParams" class="question-search-form">
+                <el-form-item label="试题内容">
+                  <el-input v-model="questionQueryParams.questionContent" placeholder="请输入试题内容关键字" clearable @keyup.enter="searchQuestions" />
+                </el-form-item>
+                <el-form-item label="题目类型">
+                  <el-select v-model="questionQueryParams.questionTypeId" placeholder="请选择题目类型" clearable>
+                    <el-option 
+                      v-for="item in questionTypeOptions" 
+                      :key="item.typeId" 
+                      :label="item.typeName" 
+                      :value="item.typeId"
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" @click="searchQuestions">搜索</el-button>
+                  <el-button @click="resetQuestionQuery">重置</el-button>
+                </el-form-item>
+              </el-form>
+              <el-table :data="questionList" border stripe style="width: 100%" v-loading="questionLoading">
+                <el-table-column type="index" label="#" width="50" align="center" />
+                <el-table-column prop="questionContent" label="试题内容" min-width="250" show-overflow-tooltip>
+                  <template #default="scope">
+                    <div v-html="formatQuestionContent(scope.row.questionContent)"></div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="typeName" label="题目类型" width="100" align="center" />
+                <el-table-column prop="difficulty" label="难度" width="80" align="center">
+                  <template #default="scope">
+                    <el-tag :type="getDifficultyTag(scope.row.difficulty)">
+                      {{ getDifficultyLabel(scope.row.difficulty) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="createTime" label="创建时间" width="170" />
+                <el-table-column label="操作" width="220" align="center" fixed="right">
+                  <template #default="scope">
+                    <el-button size="small" type="primary" @click="viewQuestion(scope.row)">预览</el-button>
+                    <el-button size="small" type="warning" @click="handleEditQuestion(scope.row)">编辑</el-button>
+                    <el-button size="small" type="danger" @click="deleteQuestion(scope.row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <!-- 分页 -->
+              <div class="pagination-container">
+                <el-pagination
+                  :current-page="questionQueryParams.pageNum"
+                  :page-size="questionQueryParams.pageSize"
+                  :page-sizes="[10, 20, 50, 100]"
+                  :total="questionTotal"
+                  layout="total, sizes, prev, pager, next, jumper"
+                  @size-change="handleQuestionSizeChange"
+                  @current-change="handleQuestionCurrentChange"
+                />
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+        
+        <el-tab-pane label="考试管理" name="exam">
+          <div class="tab-container">
+            <!-- 这里可以引入考试管理组件 -->
+            <p class="placeholder-text">考试管理功能正在加载中...</p>
+            <el-button type="primary" @click="handleExamAction">创建考试</el-button>
+          </div>
+        </el-tab-pane>
+        
+        <el-tab-pane label="作业管理" name="assignment">
+          <div class="tab-container">
+            <!-- 作业管理组件 -->
+            <div class="assignment-section">
+              <div class="section-header">
+                <h3>作业列表</h3>
+                <el-button type="primary" @click="openCreateAssignmentDialog">发布作业</el-button>
+              </div>
+              
+              <!-- 作业列表 -->
+              <el-table :data="assignmentList" border stripe style="width: 100%" v-loading="assignmentLoading">
+                <el-table-column type="index" label="#" width="50" align="center" />
+                <el-table-column prop="title" label="作业标题" min-width="100" show-overflow-tooltip />
+                <el-table-column prop="totalPoints" label="总分" width="80" align="center" />
+                <el-table-column label="状态" width="100" align="center">
+                  <template #default="scope">
+                    <el-tag :type="getAssignmentStatusTag(scope.row.status)">
+                      {{ getAssignmentStatusLabel(scope.row.status) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="提交情况" width="120" align="center">
+                  <template #default="scope">
+                    {{ scope.row.submittedCount || 0 }} / {{ scope.row.studentCount || 0 }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="startTime" label="发布时间" width="160" align="center" show-overflow-tooltip />
+                <el-table-column prop="dueTime" label="截止时间" width="160" align="center" show-overflow-tooltip />
+                <el-table-column label="操作" width="280" align="center">
+                  <template #default="scope">
+                    <el-button size="small" type="primary" @click="viewAssignment(scope.row)">详情</el-button>
+                    <el-button size="small" type="warning" @click="editAssignment(scope.row)">编辑</el-button>
+                    <el-button size="small" type="info" @click="associateQuestions(scope.row)">关联题目</el-button>
+                    <el-button size="small" type="success" @click="reviewAssignment(scope.row)">批阅</el-button>
+                    <el-button size="small" type="danger" @click="deleteAssignment(scope.row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              
+              <!-- 分页 -->
+              <div class="pagination-container">
+                <el-pagination
+                  :current-page="assignmentQueryParams.pageNum"
+                  :page-size="assignmentQueryParams.pageSize"
+                  :page-sizes="[10, 20, 50, 100]"
+                  :total="assignmentTotal"
+                  layout="total, sizes, prev, pager, next, jumper"
+                  @size-change="handleAssignmentSizeChange"
+                  @current-change="handleAssignmentCurrentChange"
+                />
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+        
+        <el-tab-pane label="讨论区管理" name="discussion">
+          <div class="tab-container">
+            <!-- 讨论区管理 -->
+            <div class="discussion-section">
+              <div class="section-header">
+                <h3>讨论区列表</h3>
+                <el-button type="primary" @click="openCreateDiscussionDialog">创建讨论区</el-button>
+              </div>
+              <el-table :data="discussionList" border stripe style="width: 100%">
+                <el-table-column prop="forumName" label="讨论区标题" min-width="150"></el-table-column>
+                <el-table-column prop="description" label="讨论区描述" min-width="200"></el-table-column>
+                <el-table-column prop="createTime" label="创建时间" width="180"></el-table-column>
+                <el-table-column prop="topicCount" label="主题数" width="100"></el-table-column>
+                <el-table-column prop="replyCount" label="回复数" width="100"></el-table-column>
+                <el-table-column label="操作" width="200">
+                  <template #default="scope">
+                    <el-button size="small" @click="handleViewDiscussion(scope.row)">查看</el-button>
+                    <el-button size="small" type="danger" @click="handleDeleteDiscussion(scope.row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
+
+    <!-- 创建讨论区对话框 -->
+    <el-dialog 
+      v-model="createDiscussionDialogVisible" 
+      title="创建讨论区" 
+      width="50%"
+      :before-close="handleCloseDiscussionDialog"
+    >
+      <el-form :model="discussionForm" label-width="100px" :rules="discussionRules" ref="discussionFormRef">
+        <el-form-item label="讨论区标题" prop="title">
+          <el-input v-model="discussionForm.title" placeholder="请输入讨论区标题"></el-input>
+        </el-form-item>
+        <el-form-item label="讨论区描述" prop="description">
+          <el-input 
+            v-model="discussionForm.description" 
+            type="textarea" 
+            :rows="4" 
+            placeholder="请输入讨论区描述"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="是否允许学生创建主题">
+          <el-switch v-model="discussionForm.allowStudentTopic"></el-switch>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="handleCloseDiscussionDialog">取消</el-button>
+          <el-button type="primary" @click="handleCreateDiscussion">确认</el-button>
+        </span>
+      </template>
+    </el-dialog>
+    
+    <!-- 上传/编辑资源对话框 -->
+    <el-dialog 
+      v-model="createResourceDialogVisible" 
+      :title="isEditMode ? '编辑资源' : '上传资源'" 
+      width="50%"
+      :before-close="handleCloseResourceDialog"
+    >
+      <el-form :model="resourceForm" label-width="100px" :rules="resourceRules" ref="resourceFormRef">
+        <el-form-item label="资源名称" prop="resourceName">
+          <el-input v-model="resourceForm.resourceName" placeholder="请输入资源名称"></el-input>
+        </el-form-item>
+        <el-form-item label="资源描述" prop="description">
+          <el-input 
+            v-model="resourceForm.description" 
+            type="textarea" 
+            :rows="3" 
+            placeholder="请输入资源描述"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="资源类型" prop="resourceType">
+          <el-select v-model="resourceForm.resourceType" placeholder="请选择资源类型">
+            <el-option 
+              v-for="type in resourceTypeList" 
+              :key="type.typeId" 
+              :label="type.typeName" 
+              :value="type.typeId"
+            ></el-option>
+            <!-- 后备选项，当API加载失败时显示 -->
+            <el-option v-if="resourceTypeList.length === 0" label="文档" value="document"></el-option>
+            <el-option v-if="resourceTypeList.length === 0" label="视频" value="video"></el-option>
+            <el-option v-if="resourceTypeList.length === 0" label="音频" value="audio"></el-option>
+            <el-option v-if="resourceTypeList.length === 0" label="图片" value="image"></el-option>
+            <el-option v-if="resourceTypeList.length === 0" label="其他" value="other"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="上传文件" prop="fileUrl" v-if="!isEditMode">
+          <el-upload
+            class="upload-container"
+            drag
+            action="#"
+            :http-request="handleFileUpload"
+            :before-upload="beforeUpload"
+            :limit="1"
+            :on-exceed="handleExceed"
+            :file-list="fileList"
+            :disabled="uploading"
+          >
+            <template #trigger>
+              <el-button :loading="uploading" type="primary">
+                {{ uploading ? '上传中...' : '选择文件' }}
+              </el-button>
+            </template>
+            <el-icon class="el-icon--upload"><Upload /></el-icon>
+            <div class="el-upload__text">拖拽文件到此处或 <em>点击上传</em></div>
+            <template #tip>
+              <div class="el-upload__tip">
+                支持任意类型文件，单文件大小不超过100MB，文件将直接上传到云服务器
+              </div>
+            </template>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="文件信息" v-if="isEditMode && resourceForm.fileUrl">
+          <div class="file-info">
+            <div>文件名称: {{ resourceForm.fileName }}</div>
+            <div>文件URL: <el-link type="primary" :href="resourceForm.fileUrl" target="_blank" :underline="false">{{ resourceForm.fileUrl }}</el-link></div>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="handleCloseResourceDialog">取消</el-button>
+          <el-button type="primary" @click="handleSubmitResource">{{ isEditMode ? '保存修改' : '确认上传' }}</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 题目预览对话框 -->
+    <el-dialog 
+      v-model="questionPreviewDialog.visible" 
+      :title="questionPreviewDialog.title" 
+      width="60%"
+      :before-close="handleCloseQuestionPreview"
+    >
+      <div class="question-preview-content">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="题目内容">
+            <div v-html="currentQuestion.questionContent"></div>
+          </el-descriptions-item>
+          <el-descriptions-item label="题目类型">
+            {{ currentQuestion.typeName }}
+          </el-descriptions-item>
+          <el-descriptions-item label="难度">
+            <el-tag :type="getDifficultyTag(currentQuestion.difficulty)">
+              {{ getDifficultyLabel(currentQuestion.difficulty) }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="选项" v-if="currentQuestion.options && currentQuestion.options.length > 0">
+            <div class="question-options">
+              <div v-for="(option, index) in currentQuestion.options" :key="index" class="option-item">
+                <div class="option-label">{{ option.label || String.fromCharCode(65 + index) }}:</div>
+                <div class="option-content" v-html="option.content"></div>
+              </div>
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item label="正确答案">
+            {{ formatCorrectAnswer(currentQuestion.correctAnswer) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="解析" v-if="currentQuestion.explanation">
+            <div v-html="currentQuestion.explanation"></div>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="handleCloseQuestionPreview">关闭</el-button>
+          <el-button type="warning" @click="handleEditQuestion(currentQuestion)">编辑</el-button>
+        </span>
+      </template>
+    </el-dialog>
+    
+    <!-- 题目添加/编辑对话框 -->
+    <el-dialog 
+      v-model="questionEditDialog.visible" 
+      :title="questionEditDialog.title" 
+      width="60%" 
+      destroy-on-close
+      @close="resetQuestionForm"
+    >
+      <el-form ref="questionFormRef" :model="questionForm" :rules="questionRules" label-width="100px">
+        <!-- 试题类型 -->
+        <el-form-item label="试题类型" prop="questionTypeId">
+          <el-select v-model="questionForm.questionTypeId" placeholder="请选择试题类型" style="width: 100%" @change="handleQuestionTypeChange">
+            <el-option
+              v-for="item in questionTypeOptions"
+              :key="item.typeId"
+              :label="item.typeName"
+              :value="item.typeId"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <!-- 试题内容 -->
+        <el-form-item label="试题内容" prop="questionContent">
+          <el-input
+            v-model="questionForm.questionContent"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入试题内容"
+          />
+        </el-form-item>
+        
+        <!-- 选项 (单选题/多选题) -->
+        <div v-if="questionForm.questionTypeId === 1 || questionForm.questionTypeId === 2">
+          <el-divider content-position="left">选项</el-divider>
+          <div v-for="(option, index) in questionForm._options" :key="index" class="option-form-item">
+            <el-form-item :label="`选项 ${String.fromCharCode(65 + index)}`" :prop="`_options.${index}.content`" :rules="{ required: true, message: '选项内容不能为空', trigger: 'blur' }">
+              <div class="option-form-content">
+                <el-input v-model="option.content" placeholder="请输入选项内容" />
+                <el-button type="danger" icon="Delete" circle @click="removeOption(index)" v-if="questionForm._options.length > 2"></el-button>
+              </div>
+              <div class="option-error" v-if="option.content === ''">选项内容不能为空</div>
+            </el-form-item>
+          </div>
+          <el-button type="primary" plain @click="addOption" :disabled="questionForm._options.length >= 6">添加选项</el-button>
+        </div>
+        
+        <!-- 答案 -->
+        <el-form-item label="答案" prop="correctAnswer">
+          <!-- 单选题 -->
+          <template v-if="questionForm.questionTypeId === 1">
+            <el-radio-group v-model="questionForm.correctAnswer">
+              <el-radio v-for="(option, index) in questionForm._options" :key="index" :label="String.fromCharCode(65 + index)">
+                {{ String.fromCharCode(65 + index) }}
+              </el-radio>
+            </el-radio-group>
+          </template>
+          
+          <!-- 多选题 -->
+          <template v-else-if="questionForm.questionTypeId === 2">
+            <el-checkbox-group v-model="questionForm._answerArray">
+              <el-checkbox v-for="(option, index) in questionForm._options" :key="index" :label="String.fromCharCode(65 + index)">
+                {{ String.fromCharCode(65 + index) }}
+              </el-checkbox>
+            </el-checkbox-group>
+          </template>
+          
+          <!-- 判断题 -->
+          <template v-else-if="questionForm.questionTypeId === 3">
+            <el-radio-group v-model="questionForm.correctAnswer">
+              <el-radio label="true">正确</el-radio>
+              <el-radio label="false">错误</el-radio>
+            </el-radio-group>
+          </template>
+          
+          <!-- 填空题/简答题/其他 -->
+          <template v-else>
+            <el-input
+              v-model="questionForm.correctAnswer"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入答案"
+            />
+          </template>
+        </el-form-item>
+        
+        <!-- 解析 -->
+        <el-form-item label="解析" prop="explanation">
+          <el-input
+            v-model="questionForm.explanation"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入试题解析（选填）"
+          />
+        </el-form-item>
+        
+        <!-- 难度 -->
+        <el-form-item label="难度" prop="difficulty">
+          <el-select v-model="questionForm.difficulty" placeholder="请选择难度" style="width: 100%">
+            <el-option label="简单" value="easy" />
+            <el-option label="中等" value="medium" />
+            <el-option label="困难" value="hard" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="questionEditDialog.visible = false">取消</el-button>
+          <el-button type="primary" @click="submitQuestionForm">确定</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 作业表单对话框 -->
+    <el-dialog 
+      v-model="assignmentDialog.visible" 
+      :title="assignmentDialog.title" 
+      width="700px" 
+      destroy-on-close
+      @closed="resetAssignmentForm"
+    >
+      <el-form ref="assignmentFormRef" :model="assignmentForm" :rules="assignmentRules" label-width="100px">
+        <el-form-item label="所属课程" prop="courseId">
+          <el-input v-model="currentCourse.courseName" disabled />
+          <!-- 隐藏域不能正确传递数据，改为使用el-input -->
+          <el-input v-model="assignmentForm.courseId" type="hidden" />
+        </el-form-item>
+        <el-form-item label="作业标题" prop="title">
+          <el-input v-model="assignmentForm.title" placeholder="请输入作业标题" />
+        </el-form-item>
+        <el-form-item label="作业内容" prop="content">
+          <el-input v-model="assignmentForm.content" type="textarea" :rows="5" placeholder="请输入作业内容" />
+        </el-form-item>
+        <el-form-item label="关联题库" prop="questionIds">
+          <el-select 
+            v-model="assignmentForm.questionIds" 
+            multiple 
+            filterable 
+            placeholder="请选择关联题库" 
+            style="width: 100%"
+            :loading="questionSelectLoading"
+          >
+            <el-option 
+              v-for="item in courseQuestionOptions" 
+              :key="item.questionId" 
+              :label="item.questionTitle" 
+              :value="item.questionId"
+            >
+              <div class="question-select-item">
+                <div>{{ item.questionTitle }}</div>
+                <div class="question-select-info">
+                  <el-tag size="small">{{ item.typeName }}</el-tag>
+                  <el-tag size="small" :type="getDifficultyTag(item.difficulty)">
+                    {{ getDifficultyLabel(item.difficulty) }}
+                  </el-tag>
+                </div>
+              </div>
+            </el-option>
+          </el-select>
+          <div class="form-help-text">选择课程题库中的问题关联到作业中</div>
+        </el-form-item>
+        <el-form-item label="总分" prop="totalPoints">
+          <el-input-number v-model="assignmentForm.totalPoints" :min="0" :max="100" :step="5" style="width: 150px" />
+        </el-form-item>
+        <el-form-item label="发布时间" prop="startTime">
+          <el-date-picker
+            v-model="assignmentForm.startTime"
+            type="datetime"
+            placeholder="选择发布时间"
+            style="width: 100%"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+          />
+        </el-form-item>
+        <el-form-item label="截止时间" prop="dueTime">
+          <el-date-picker
+            v-model="assignmentForm.dueTime"
+            type="datetime"
+            placeholder="选择截止时间"
+            style="width: 100%"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+          />
+        </el-form-item>
+        <el-form-item label="上传要求" prop="fileRequirements">
+          <el-input v-model="assignmentForm.fileRequirements" type="textarea" :rows="3" placeholder="请输入上传文件要求（可选）" />
+        </el-form-item>
+        <el-form-item label="是否公开评分">
+          <el-switch v-model="assignmentForm.publicScore" />
+          <div class="form-help-text">开启后，学生可以查看自己的评分和教师评语</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="assignmentDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="submitAssignmentForm" :loading="assignmentSubmitLoading">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 关联题目对话框 -->
+    <el-dialog 
+      v-model="questionAssociateDialog.visible" 
+      :title="questionAssociateDialog.title" 
+      width="800px" 
+      destroy-on-close
+      class="question-associate-dialog"
+    >
+      <div class="question-associate-container">
+        <div class="selected-questions-panel">
+          <div class="panel-header">
+            <h3>已选题目 ({{ selectedQuestions.length }})</h3>
+          </div>
+          <div v-if="selectedQuestions.length > 0" class="selected-questions-list">
+            <div v-for="(item, index) in selectedQuestions" :key="item.questionId" class="selected-question-item">
+              <div class="question-index">{{ index + 1 }}</div>
+              <div class="question-content">
+                <div class="question-title" v-html="formatQuestionContent(item.questionContent)"></div>
+                <div class="question-meta">
+                  <el-tag size="small">{{ item.typeName }}</el-tag>
+                  <el-tag size="small" :type="getDifficultyTag(item.difficulty)">
+                    {{ getDifficultyLabel(item.difficulty) }}
+                  </el-tag>
+                  <span class="question-points">
+                    <el-input-number 
+                      v-model="item.points" 
+                      :min="1" 
+                      :max="100" 
+                      size="small"
+                      controls-position="right"
+                      @change="calculateTotalPoints"
+                    ></el-input-number> 分
+                  </span>
+                </div>
+              </div>
+              <div class="question-actions">
+                <el-button type="danger" circle size="small" icon="Delete" @click="removeSelectedQuestion(index)"></el-button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-selected">
+            <el-empty description="暂无选择题目" :image-size="100">
+              <template #description>
+                <p>从下方课程题库中选择题目</p>
+              </template>
+            </el-empty>
+          </div>
+          <div class="selected-summary">
+            <div class="summary-item">总分: <span class="summary-value">{{ totalPoints }}</span></div>
+            <div class="summary-item">题数: <span class="summary-value">{{ selectedQuestions.length }}</span></div>
+          </div>
+        </div>
+        
+        <div class="question-pool-panel">
+          <div class="panel-header">
+            <h3>课程题库</h3>
+            <div class="search-box">
+              <el-input 
+                v-model="questionSearchKeyword" 
+                placeholder="搜索题目内容" 
+                clearable 
+                @keyup.enter="searchQuestionsInPool"
+              >
+                <template #append>
+                  <el-button icon="Search" @click="searchQuestionsInPool"></el-button>
+                </template>
+              </el-input>
+            </div>
+          </div>
+          
+          <el-table 
+            :data="questionPool" 
+            border 
+            style="width: 100%" 
+            height="300"
+            v-loading="questionPoolLoading"
+            @selection-change="handleQuestionSelectionChange"
+          >
+            <el-table-column type="selection" width="40" align="center" />
+            <el-table-column prop="questionContent" label="题目内容" min-width="250" show-overflow-tooltip>
+              <template #default="scope">
+                <div v-html="formatQuestionContent(scope.row.questionContent)"></div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="typeName" label="题型" width="100" align="center" />
+            <el-table-column prop="difficulty" label="难度" width="70" align="center">
+              <template #default="scope">
+                <el-tag :type="getDifficultyTag(scope.row.difficulty)">
+                  {{ getDifficultyLabel(scope.row.difficulty) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="70" align="center">
+              <template #default="scope">
+                <el-button size="small" type="primary" circle icon="Plus" @click="addQuestionToSelected(scope.row)"></el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="table-footer">
+            <el-button type="primary" @click="addSelectedQuestions" :disabled="multipleSelection.length === 0">
+              添加选中题目 ({{ multipleSelection.length }})
+            </el-button>
+            
+            <el-pagination
+              v-if="questionPoolTotal > 0"
+              class="question-pool-pagination"
+              :current-page="questionPoolQuery.pageNum"
+              :page-size="questionPoolQuery.pageSize"
+              :page-sizes="[5, 10, 20, 30]"
+              :total="questionPoolTotal"
+              layout="total, sizes, prev, pager, next"
+              @size-change="handleQuestionPoolSizeChange"
+              @current-change="handleQuestionPoolCurrentChange"
+            />
+            
+          </div>
+
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="questionAssociateDialog.visible = false">取消</el-button>
+          <el-button type="primary" @click="saveQuestionAssociation" :loading="savingAssociation">保存关联</el-button>
+        </div>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted, watch } from 'vue';
+import { ElMessage, ElMessageBox, ElLoading } from 'element-plus';
+import { Search, Refresh, View, Upload, Edit, Document, Collection, Picture, ArrowDown, Delete } from '@element-plus/icons-vue';
+import { useRouter } from 'vue-router';
+
+// 导入API
+import { getTeacherCourseList } from '@/api/edu/course';
+// 导入讨论区相关的API
+import { getForumList, createForum, deleteForum } from '@/api/edu/discussion';
+// 导入资源相关的API
+import { 
+  getResourceList, 
+  uploadResource, 
+  deleteResource, 
+  downloadResource,
+  getCourseResourceList,
+  getResourceTypeList,
+  uploadResourceFile,
+  getAllEnabledResourceTypes,
+  updateResource
+} from '@/api/edu/resource';
+// 导入题库相关的API
+import { 
+  getQuestionList, 
+  getQuestionInfo, 
+  addQuestion, 
+  updateQuestion, 
+  deleteQuestion as deleteQuestionApi 
+} from '@/api/exam/question';
+import { getQuestionTypeList } from '@/api/exam/questionType';
+import { 
+  getAssignmentList, 
+  getAssignmentInfo, 
+  addAssignment, 
+  updateAssignment, 
+  deleteAssignment as deleteAssignmentApi,
+  getAssignmentQuestions,
+  saveAssignmentQuestions
+} from '@/api/exam/assignment'
+
+const router = useRouter();
+
+// 默认课程封面图
+const defaultCover = 'https://cube.elemecdn.com/e/fd/0fc7d20532fdaf769a25683617711png.png';
+
+// 加载状态
+const loading = ref(false);
+// 课程列表
+const courseList = ref([]);
+// 总记录数
+const total = ref(0);
+// 查询参数
+const queryParams = reactive({
+  pageNum: 1,
+  pageSize: 8,
+  courseName: '',
+  status: ""
+});
+
+// 课程详情对话框
+const detailDialogVisible = ref(false);
+const currentCourse = ref({});
+const activeTab = ref('info');
+
+// 讨论区相关
+const discussionList = ref([]);
+const createDiscussionDialogVisible = ref(false);
+const discussionForm = reactive({
+  courseId: '',
+  title: '',
+  description: '',
+  allowStudentTopic: true
+});
+const discussionFormRef = ref(null);
+const discussionRules = {
+  title: [{ required: true, message: '请输入讨论区标题', trigger: 'blur' }],
+  description: [{ required: true, message: '请输入讨论区描述', trigger: 'blur' }]
+};
+
+// 资源管理相关
+const resourceList = ref([]);
+const createResourceDialogVisible = ref(false);
+const fileList = ref([]);
+const uploading = ref(false); // 添加上传状态标记
+const resourceFormRef = ref(null);
+const isEditMode = ref(false); // 添加编辑模式标记
+const currentResourceId = ref(null); // 添加当前编辑的资源ID
+const resourceForm = reactive({
+  courseId: '',
+  resourceName: '',
+  description: '',
+  resourceType: 'document',
+  fileUrl: '', // 将file替换为fileUrl
+  fileName: '' // 添加文件名字段
+});
+const resourceRules = {
+  resourceName: [{ required: true, message: '请输入资源名称', trigger: 'blur' }],
+  resourceType: [{ required: true, message: '请选择资源类型', trigger: 'change' }],
+  fileUrl: [{ required: true, message: '请上传文件', trigger: 'change' }] // 更改验证字段
+};
+
+// 资源类型相关
+const resourceTypeList = ref([]);
+
+// 题库管理相关
+const questionList = ref([]);
+const questionLoading = ref(false);
+const questionTotal = ref(0);
+const questionTypeOptions = ref([]);
+const questionQueryParams = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  questionContent: '',
+  questionTypeId: undefined,
+  courseId: undefined
+});
+
+// 题目预览对话框
+const questionPreviewDialog = reactive({
+  visible: false,
+  title: '试题预览'
+});
+
+// 当前操作的试题
+const currentQuestion = reactive({
+  questionId: undefined,
+  questionTypeId: undefined,
+  typeName: '',
+  questionContent: '',
+  options: [],
+  correctAnswer: '',
+  explanation: '',
+  difficulty: ''
+});
+
+// 题目添加/编辑对话框
+const questionEditDialog = reactive({
+  visible: false,
+  title: '编辑试题'
+});
+
+// 题目编辑/添加相关
+const questionFormRef = ref(null);
+const questionForm = reactive({
+  questionId: undefined, // 题目ID（修改时必填）
+  questionTypeId: undefined, // 题目类型ID
+  questionContent: '', // 题目内容
+  options: '[]', // 选项（JSON格式）
+  correctAnswer: '', // 正确答案
+  explanation: '', // 解析
+  difficulty: 'medium', // 难度（easy简单 medium中等 hard困难）
+  courseId: undefined, // 课程ID
+  status: 1, // 状态（1正常 0停用）
+  // 用于UI展示的临时字段
+  _options: [
+    { content: '' },
+    { content: '' },
+    { content: '' },
+    { content: '' }
+  ],
+  _answerArray: [] // 用于多选题的临时答案数组
+});
+
+// 题目校验规则
+const questionRules = {
+  questionTypeId: [
+    { required: true, message: '请选择题目类型', trigger: 'change' }
+  ],
+  questionContent: [
+    { required: true, message: '请输入题目内容', trigger: 'blur' }
+  ],
+  correctAnswer: [
+    { required: true, message: '请选择/输入正确答案', trigger: 'blur' }
+  ],
+  difficulty: [
+    { required: true, message: '请选择难度', trigger: 'change' }
+  ]
+};
+
+// 监听多选题答案数组变化，自动更新答案字段
+watch(() => questionForm._answerArray, (val) => {
+  if (questionForm.questionTypeId === 2) {
+    questionForm.correctAnswer = val.sort().join('');
+  }
+}, { deep: true });
+
+// 作业管理相关
+const assignmentList = ref([])
+const assignmentTotal = ref(0)
+const assignmentLoading = ref(false)
+const assignmentSubmitLoading = ref(false)
+const assignmentQueryParams = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  courseId: undefined
+})
+const assignmentFormRef = ref(null)
+const assignmentDialog = reactive({
+  visible: false,
+  title: ''
+})
+const assignmentForm = reactive({
+  assignmentId: undefined,
+  courseId: undefined,
+  title: '',
+  content: '',
+  questionIds: [],
+  totalPoints: 100,
+  startTime: '',
+  dueTime: '',
+  fileRequirements: '',
+  publicScore: true
+})
+const assignmentRules = {
+  title: [
+    { required: true, message: '请输入作业标题', trigger: 'blur' }
+  ],
+  content: [
+    { required: true, message: '请输入作业内容', trigger: 'blur' }
+  ],
+  totalPoints: [
+    { required: true, message: '请设置总分', trigger: 'blur' }
+  ],
+  startTime: [
+    { required: true, message: '请选择发布时间', trigger: 'change' }
+  ],
+  dueTime: [
+    { required: true, message: '请选择截止时间', trigger: 'change' }
+  ]
+}
+
+// 题库选择相关
+const courseQuestionOptions = ref([])
+const questionSelectLoading = ref(false)
+
+/**
+ * 查询课程列表
+ */
+const getList = async () => {
+  loading.value = true;
+  try {
+    const response = await getTeacherCourseList(queryParams);
+    courseList.value = response.data.records || [];
+    total.value = response.data.total || 0;
+  } catch (error) {
+    console.error('获取课程列表失败', error);
+    ElMessage.error('获取课程列表失败: ' + (error.message || '未知错误'));
+  } finally {
+    loading.value = false;
+  }
+};
+
+/**
+ * 搜索按钮操作
+ */
+const handleQuery = () => {
+  queryParams.pageNum = 1;
+  getList();
+};
+
+/**
+ * 重置搜索表单
+ */
+const resetQuery = () => {
+  queryParams.courseName = '';
+  queryParams.status = undefined;
+  handleQuery();
+};
+
+/**
+ * 格式化日期
+ */
+const formatDate = (dateStr) => {
+  if (!dateStr) return '未设置';
+  return dateStr.split('T')[0];
+};
+
+/**
+ * 获取状态标签类型
+ */
+const getStatusTag = (status) => {
+  if (status === "draft") return 'info';
+  if (status === "published") return 'success';
+  if (status === "closed") return 'danger';
+  return 'info';
+};
+
+/**
+ * 获取状态标签文本
+ */
+const getStatusLabel = (status) => {
+  if (status === "draft") return '草稿';
+  if (status === "published") return '进行中';
+  if (status === "closed") return '已结束';
+  return '未知';
+};
+
+/**
+ * 处理分页大小改变
+ */
+const handleSizeChange = (size) => {
+  queryParams.pageSize = size;
+  getList();
+};
+
+/**
+ * 处理页码改变
+ */
+const handleCurrentChange = (num) => {
+  queryParams.pageNum = num;
+  getList();
+};
+
+/**
+ * 打开课程详情对话框
+ */
+const openCourseDetail = (course) => {
+  currentCourse.value = course;
+  detailDialogVisible.value = true;
+  activeTab.value = 'info';
+};
+
+/**
+ * 关闭课程详情对话框
+ */
+const handleCloseDialog = () => {
+  detailDialogVisible.value = false;
+  currentCourse.value = {};
+};
+
+/**
+ * 处理资源管理操作
+ */
+const handleResourceAction = () => {
+  // 打开资源上传对话框
+  openCreateResourceDialog();
+};
+
+/**
+ * 处理题库管理操作
+ */
+const handleQuestionAction = () => {
+  // 打开添加试题对话框
+  openQuestionAddDialog();
+};
+
+/**
+ * 打开添加试题对话框
+ */
+const openQuestionAddDialog = () => {
+  questionEditDialog.title = '添加试题';
+  questionEditDialog.visible = true;
+  resetQuestionForm();
+  
+  // 设置当前课程ID
+  questionForm.courseId = currentCourse.value.courseId;
+  
+  // 默认选择第一个题目类型
+  if (questionTypeOptions.value.length > 0) {
+    questionForm.questionTypeId = questionTypeOptions.value[0].typeId;
+  }
+};
+
+/**
+ * 处理题库预览
+ */
+const viewQuestion = (question) => {
+  // 填充当前操作的试题数据
+  currentQuestion.questionId = question.questionId;
+  currentQuestion.questionTypeId = question.questionTypeId;
+  currentQuestion.typeName = question.typeName;
+  currentQuestion.questionContent = question.questionContent;
+  
+  // 处理选项数据，将JSON字符串转换为数组
+  if (question.options) {
+    try {
+      // 对于后端返回的选项格式 [{key: "A", value: "选项内容"}, ...] 进行特殊处理
+      const optionsArray = typeof question.options === 'string' 
+        ? JSON.parse(question.options) 
+        : question.options;
+      
+      // 将选项转换为统一的格式
+      currentQuestion.options = optionsArray.map(opt => ({
+        label: opt.key || '',
+        content: opt.value || opt.content || ''
+      }));
+    } catch (error) {
+      console.error('解析选项数据失败', error);
+      currentQuestion.options = [];
+    }
+  } else {
+    currentQuestion.options = [];
+  }
+  
+  currentQuestion.correctAnswer = question.correctAnswer || '';
+  currentQuestion.explanation = question.explanation || '';
+  currentQuestion.difficulty = question.difficulty || '';
+  
+  // 打开题目预览对话框
+  questionPreviewDialog.visible = true;
+  questionPreviewDialog.title = `试题预览 - ${question.typeName}`;
+};
+
+/**
+ * 处理考试管理操作
+ */
+const handleExamAction = () => {
+  // 这里可以直接处理创建考试逻辑，或者跳转到考试创建页面
+  router.push({
+    path: '/exam/paper/edit',
+    query: { courseId: currentCourse.value.courseId, courseName: currentCourse.value.courseName }
+  });
+};
+
+/**
+ * 处理作业管理操作
+ */
+const handleAssignmentAction = () => {
+  // 这里可以直接处理发布作业逻辑，或者跳转到作业发布页面
+  router.push({
+    path: '/exam/assignment',
+    query: { 
+      action: 'create', 
+      courseId: currentCourse.value.courseId, 
+      courseName: currentCourse.value.courseName 
+    }
+  });
+};
+
+/**
+ * 加载讨论区列表
+ */
+const loadDiscussionList = async () => {
+  try {
+    const response = await getForumList({ 
+      courseId: currentCourse.value.courseId,
+      pageNum: 1,
+      pageSize: 50
+    });
+    discussionList.value = response.data.records || [];
+  } catch (error) {
+    console.error('获取讨论区列表失败', error);
+    ElMessage.error('获取讨论区列表失败: ' + (error.message || '未知错误'));
+  }
+};
+
+/**
+ * 打开创建讨论区对话框
+ */
+const openCreateDiscussionDialog = () => {
+  discussionForm.courseId = currentCourse.value.courseId;
+  discussionForm.title = '';
+  discussionForm.description = '';
+  discussionForm.allowStudentTopic = true;
+  createDiscussionDialogVisible.value = true;
+};
+
+/**
+ * 关闭创建讨论区对话框
+ */
+const handleCloseDiscussionDialog = () => {
+  createDiscussionDialogVisible.value = false;
+  if (discussionFormRef.value) {
+    discussionFormRef.value.resetFields();
+  }
+};
+
+/**
+ * 创建讨论区
+ */
+const handleCreateDiscussion = () => {
+  if (discussionFormRef.value) {
+    discussionFormRef.value.validate(async (valid) => {
+      if (valid) {
+        try {
+          // 准备请求数据
+          const forumData = {
+            courseId: currentCourse.value.courseId,
+            title: discussionForm.title,
+            description: discussionForm.description,
+            allowStudentTopic: discussionForm.allowStudentTopic
+          };
+          
+          await createForum(forumData);
+          ElMessage.success('讨论区创建成功');
+          createDiscussionDialogVisible.value = false;
+          
+          // 刷新讨论区列表
+          loadDiscussionList();
+        } catch (error) {
+          console.error('创建讨论区失败', error);
+          ElMessage.error('创建讨论区失败: ' + (error.message || '未知错误'));
+        }
+      }
+    });
+  }
+};
+
+/**
+ * 查看讨论区
+ */
+const handleViewDiscussion = (discussion) => {
+  // 跳转到讨论区详情页面
+  router.push({
+    path: `/discussion/detail/${discussion.forumId}`,
+    query: { 
+      courseId: currentCourse.value.courseId, 
+      courseName: currentCourse.value.courseName 
+    }
+  });
+};
+
+/**
+ * 删除讨论区
+ */
+const handleDeleteDiscussion = (discussion) => {
+  ElMessageBox.confirm(
+    `确定要删除讨论区"${discussion.title}"吗？`,
+    '警告',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  ).then(async () => {
+    try {
+      await deleteForum(discussion.forumId);
+      ElMessage.success('讨论区删除成功');
+      
+      // 刷新讨论区列表
+      loadDiscussionList();
+    } catch (error) {
+      console.error('删除讨论区失败', error);
+      ElMessage.error('删除讨论区失败: ' + (error.message || '未知错误'));
+    }
+  }).catch(() => {
+    // 取消删除
+  });
+};
+
+// 当选择标签页变化时
+const handleTabChange = (tab) => {
+  if (tab === 'discussion') {
+    loadDiscussionList();
+  } else if (tab === 'resource') {
+    loadResourceList();
+  } else if (tab === 'question') {
+    // 加载题目类型选项
+    loadQuestionTypes();
+    
+    // 设置当前课程ID到查询参数
+    if (currentCourse.value && currentCourse.value.courseId) {
+      questionQueryParams.courseId = currentCourse.value.courseId;
+      
+      // 加载题库列表
+      fetchQuestionList();
+    } else {
+      ElMessage.warning('当前课程数据无效，无法加载题库');
+    }
+  } else if (tab === 'assignment') {
+    // 加载作业列表
+    loadAssignmentList();
+  }
+};
+
+/**
+ * 获取资源类型标签类型
+ */
+const getResourceTypeTag = (type) => {
+  switch (type) {
+    case 'document': return 'primary';
+    case 'video': return 'success';
+    case 'audio': return 'warning';
+    case 'image': return 'info';
+    default: return 'info';
+  }
+};
+
+/**
+ * 获取资源类型标签文本
+ */
+const getResourceTypeLabel = (type) => {
+  // 从后端获取的资源类型列表中查找对应的标签
+  const resourceType = resourceTypeList.value.find(item => item.typeCode === type);
+  if (resourceType) {
+    return resourceType.typeName;
+  }
+  
+  // 后备方案：如果后端没有返回对应的类型，使用默认值
+  switch (type) {
+    case 'document': return '文档';
+    case 'video': return '视频';
+    case 'audio': return '音频';
+    case 'image': return '图片';
+    default: return '其他';
+  }
+};
+
+/**
+ * 格式化文件大小
+ */
+const formatFileSize = (size) => {
+  if (!size) return '0 B';
+  
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let index = 0;
+  let formattedSize = size;
+  
+  while (formattedSize >= 1024 && index < units.length - 1) {
+    formattedSize /= 1024;
+    index++;
+  }
+  
+  return `${formattedSize.toFixed(2)} ${units[index]}`;
+};
+
+/**
+ * 加载课程资源列表
+ */
+const loadResourceList = async () => {
+  if (!currentCourse.value || !currentCourse.value.courseId) {
+    ElMessage.warning('未选择课程或课程ID无效');
+    resourceList.value = [];
+    return;
+  }
+
+  try {
+    console.log('正在加载课程ID为', currentCourse.value.courseId, '的资源');
+    
+    const response = await getCourseResourceList({
+      courseId: currentCourse.value.courseId
+    });
+    
+    // 后端直接返回资源列表数组，不是分页对象
+    if (Array.isArray(response.data)) {
+      resourceList.value = response.data;
+    } else if (response.data && response.data.records) {
+      // 兼容处理，如果后端返回分页对象
+      resourceList.value = response.data.records;
+    } else {
+      resourceList.value = [];
+    }
+    
+    console.log('加载到资源:', resourceList.value.length, '条');
+  } catch (error) {
+    console.error('获取资源列表失败', error);
+    ElMessage.error('获取资源列表失败: ' + (error.message || '未知错误'));
+    resourceList.value = [];
+  }
+};
+
+/**
+ * 打开创建资源对话框
+ */
+const openCreateResourceDialog = () => {
+  isEditMode.value = false; // 设置为创建模式
+  currentResourceId.value = null;
+  resourceForm.courseId = currentCourse.value.courseId;
+  resourceForm.resourceName = '';
+  resourceForm.description = '';
+  resourceForm.resourceType = resourceTypeList.value.length > 0 ? resourceTypeList.value[0].typeId : 'document';
+  resourceForm.fileUrl = ''; // 重置fileUrl
+  resourceForm.fileName = ''; // 重置fileName
+  fileList.value = [];
+  createResourceDialogVisible.value = true;
+};
+
+/**
+ * 处理编辑资源
+ */
+const handleEditResource = (resource) => {
+  isEditMode.value = true; // 设置为编辑模式
+  currentResourceId.value = resource.resourceId;
+  
+  // 填充表单数据
+  resourceForm.courseId = resource.courseId;
+  resourceForm.resourceName = resource.resourceName;
+  resourceForm.description = resource.description || '';
+  resourceForm.resourceType = resource.resourceTypeId;
+  resourceForm.fileUrl = resource.fileUrl || '';
+  resourceForm.fileName = resource.fileName || '';
+  
+  // 如果有文件URL，显示在文件列表中
+  if (resource.fileUrl) {
+    fileList.value = [{
+      name: resource.fileName || '未知文件名',
+      url: resource.fileUrl
+    }];
+  } else {
+    fileList.value = [];
+  }
+  
+  createResourceDialogVisible.value = true;
+};
+
+/**
+ * 关闭创建/编辑资源对话框
+ */
+const handleCloseResourceDialog = () => {
+  createResourceDialogVisible.value = false;
+  isEditMode.value = false;
+  currentResourceId.value = null;
+  if (resourceFormRef.value) {
+    resourceFormRef.value.resetFields();
+  }
+  fileList.value = [];
+};
+
+/**
+ * 处理资源表单提交 (创建或更新)
+ */
+const handleSubmitResource = () => {
+  if (resourceFormRef.value) {
+    resourceFormRef.value.validate(async (valid) => {
+      if (valid) {
+        if (!isEditMode.value && !resourceForm.fileUrl) {
+          ElMessage.error('请先上传文件到云服务器');
+          return;
+        }
+        
+        try {
+          // 检查资源类型ID是否有效
+          const selectedTypeId = Number(resourceForm.resourceType);
+          const validType = resourceTypeList.value.find(type => type.typeId === selectedTypeId);
+          if (!validType) {
+            ElMessage.error('所选资源类型无效，请重新选择');
+            return;
+          }
+          
+          // 准备提交到后端的数据
+          const resourceData = {
+            courseId: Number(resourceForm.courseId),
+            resourceName: resourceForm.resourceName,
+            description: resourceForm.description,
+            resourceTypeId: selectedTypeId,
+            fileUrl: resourceForm.fileUrl,
+            fileName: resourceForm.fileName,
+            fileSize: fileList.value[0]?.size || 0
+          };
+          
+          if (isEditMode.value) {
+            // 编辑模式 - 添加资源ID
+            resourceData.resourceId = currentResourceId.value;
+            
+            // 调用更新API
+            await updateResource(resourceData);
+            ElMessage.success('资源更新成功');
+          } else {
+            // 创建模式
+            await uploadResource(resourceData);
+            ElMessage.success('资源添加成功');
+          }
+          
+          createResourceDialogVisible.value = false;
+          // 刷新资源列表
+          loadResourceList();
+        } catch (error) {
+          console.error(isEditMode.value ? '更新资源失败' : '添加资源失败', error);
+          ElMessage.error((isEditMode.value ? '更新资源失败' : '添加资源失败') + ': ' + (error.message || '未知错误'));
+        }
+      }
+    });
+  }
+};
+
+/**
+ * 处理资源下载
+ */
+const handleDownloadResource = async (resource) => {
+  try {
+    // 显示下载中提示
+    const loadingInstance = ElLoading.service({
+      text: '正在获取下载链接...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    });
+    
+    const response = await downloadResource(resource.resourceId);
+    console.log('下载响应:', response);
+    
+    // 关闭下载提示
+    loadingInstance.close();
+    
+    // 检查响应格式并获取文件信息
+    if (response.code === 200 && response.data) {
+      const fileUrl = response.data.fileUrl;
+      const fileName = response.data.fileName || resource.resourceName;
+      console.log('文件URL:', fileUrl);
+      
+      if (!fileUrl) {
+        ElMessage.error('文件URL不存在');
+        return;
+      }
+      
+      // 使用fetch直接获取文件并下载，避免打开新标签页
+      ElMessage.info('正在准备下载文件，请稍候...');
+      
+      try {
+        const fileResponse = await fetch(fileUrl);
+        if (!fileResponse.ok) throw new Error('文件下载失败');
+        
+        const blob = await fileResponse.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', fileName);
+        // 不设置target="_blank"，这样就不会打开新标签页
+        document.body.appendChild(link);
+        link.click();
+        
+        // 清理
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+        
+        ElMessage.success('文件下载成功: ' + fileName);
+      } catch (error) {
+        console.error('文件下载失败', error);
+        ElMessage.error('文件下载失败: ' + (error.message || '未知错误'));
+        
+        // 如果fetch方式失败，回退到传统下载方式
+        ElMessage.info('尝试使用替代方式下载...');
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.setAttribute('download', fileName);
+        // 不使用target="_blank"
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } else {
+      ElMessage.error('获取下载链接失败: ' + (response.message || '未知错误'));
+    }
+  } catch (error) {
+    console.error('下载资源失败', error);
+    ElMessage.error('下载资源失败: ' + (error.message || '未知错误'));
+  }
+};
+
+/**
+ * 处理资源预览
+ */
+const handlePreviewResource = (resource) => {
+  // 检查资源URL是否存在
+  if (!resource.fileUrl) {
+    ElMessage.warning('该资源没有可预览的URL');
+    return;
+  }
+  
+  // 直接在新标签页打开资源URL
+  window.open(resource.fileUrl, '_blank');
+};
+
+/**
+ * 处理资源删除
+ */
+const handleDeleteResource = (resource) => {
+  ElMessageBox.confirm(
+    `确定要删除资源"${resource.resourceName}"吗？`,
+    '警告',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  ).then(async () => {
+    try {
+      await deleteResource(resource.resourceId);
+      ElMessage.success('资源删除成功');
+      
+      // 刷新资源列表
+      loadResourceList();
+    } catch (error) {
+      console.error('删除资源失败', error);
+      ElMessage.error('删除资源失败: ' + (error.message || '未知错误'));
+    }
+  }).catch(() => {
+    // 取消删除
+  });
+};
+
+/**
+ * 加载资源类型列表
+ */
+const loadResourceTypeList = async () => {
+  try {
+    // 使用API函数获取所有启用的资源类型
+    const response = await getAllEnabledResourceTypes();
+    
+    if (response.code === 200 && response.data) {
+      resourceTypeList.value = response.data;
+      console.log('加载到资源类型:', resourceTypeList.value.length, '条');
+    } else {
+      throw new Error(response.msg || '获取资源类型列表返回数据格式错误');
+    }
+  } catch (error) {
+    console.error('获取资源类型列表失败', error);
+    ElMessage.error('获取资源类型列表失败: ' + (error.message || '未知错误'));
+    resourceTypeList.value = [];
+  }
+};
+
+/**
+ * 处理题库查询
+ */
+const searchQuestions = () => {
+  questionQueryParams.pageNum = 1;
+  // 确保查询时总是带上当前课程ID
+  questionQueryParams.courseId = currentCourse.value.courseId;
+  fetchQuestionList();
+};
+
+/**
+ * 重置题库查询
+ */
+const resetQuestionQuery = () => {
+  questionQueryParams.questionContent = '';
+  questionQueryParams.questionTypeId = undefined;
+  // 确保重置后依然保留当前课程ID
+  questionQueryParams.courseId = currentCourse.value.courseId;
+  searchQuestions();
+};
+
+/**
+ * 获取题库查询结果
+ */
+const fetchQuestionList = async () => {
+  // 确保课程ID已设置
+  if (!questionQueryParams.courseId && currentCourse.value && currentCourse.value.courseId) {
+    questionQueryParams.courseId = currentCourse.value.courseId;
+  }
+  
+  // 如果没有课程ID，则不执行查询
+  if (!questionQueryParams.courseId) {
+    ElMessage.warning('未选择课程或课程ID无效');
+    questionList.value = [];
+    questionTotal.value = 0;
+    return;
+  }
+  
+  questionLoading.value = true;
+  try {
+    const response = await getQuestionList(questionQueryParams);
+    questionList.value = response.data.rows || response.data.records || [];
+    questionTotal.value = response.data.total || 0;
+  } catch (error) {
+    console.error('获取题库列表失败', error);
+    ElMessage.error('获取题库列表失败: ' + (error.message || '未知错误'));
+    questionList.value = [];
+  } finally {
+    questionLoading.value = false;
+  }
+};
+
+/**
+ * 处理题库分页
+ */
+const handleQuestionSizeChange = (size) => {
+  questionQueryParams.pageSize = size;
+  fetchQuestionList();
+};
+
+/**
+ * 处理题库页码
+ */
+const handleQuestionCurrentChange = (num) => {
+  questionQueryParams.pageNum = num;
+  fetchQuestionList();
+};
+
+/**
+ * 处理编辑试题
+ */
+const handleEditQuestion = async (question) => {
+  try {
+    // 获取试题完整信息
+    const response = await getQuestionInfo(question.questionId);
+    const questionData = response.data;
+    
+    questionEditDialog.title = '编辑试题';
+    questionEditDialog.visible = true;
+    
+    // 重置表单
+    resetQuestionForm();
+    
+    // 设置表单数据
+    questionForm.questionId = questionData.questionId;
+    questionForm.questionTypeId = questionData.questionTypeId;
+    questionForm.questionContent = questionData.questionContent;
+    questionForm.correctAnswer = questionData.correctAnswer;
+    questionForm.explanation = questionData.explanation;
+    questionForm.difficulty = questionData.difficulty || 'medium';
+    questionForm.courseId = questionData.courseId || currentCourse.value.courseId;
+    questionForm.status = questionData.status || 1;
+    
+    // 处理选项
+    if (questionData.questionTypeId === 1 || questionData.questionTypeId === 2) {
+      try {
+        const optionsData = typeof questionData.options === 'string' 
+          ? JSON.parse(questionData.options) 
+          : questionData.options;
+          
+        questionForm._options = optionsData.map(option => ({
+          content: option.value || option.content || ''
+        }));
+        
+        // 处理多选题答案
+        if (questionData.questionTypeId === 2 && questionData.correctAnswer) {
+          questionForm._answerArray = questionData.correctAnswer.split('');
+        }
+      } catch (error) {
+        console.error('解析选项数据失败', error);
+        questionForm._options = [
+          { content: '' },
+          { content: '' },
+          { content: '' },
+          { content: '' }
+        ];
+      }
+    }
+  } catch (error) {
+    console.error('获取试题详情失败', error);
+    ElMessage.error('获取试题详情失败: ' + (error.message || '未知错误'));
+  }
+};
+
+/**
+ * 重置题目表单
+ */
+const resetQuestionForm = () => {
+  if (questionFormRef.value) {
+    questionFormRef.value.resetFields();
+  }
+  
+  questionForm.questionId = undefined;
+  questionForm.questionTypeId = undefined;
+  questionForm.questionContent = '';
+  questionForm.options = '[]';
+  questionForm.correctAnswer = '';
+  questionForm.explanation = '';
+  questionForm.difficulty = 'medium';
+  questionForm.status = 1;
+  
+  // 重置UI相关字段
+  questionForm._options = [
+    { content: '' },
+    { content: '' },
+    { content: '' },
+    { content: '' }
+  ];
+  questionForm._answerArray = [];
+  
+  // 保留课程ID
+  questionForm.courseId = currentCourse.value.courseId;
+};
+
+/**
+ * 处理题目类型变化
+ */
+const handleQuestionTypeChange = (typeId) => {
+  // 重置答案相关数据
+  questionForm.correctAnswer = '';
+  questionForm._answerArray = [];
+};
+
+/**
+ * 添加选项
+ */
+const addOption = () => {
+  if (questionForm._options.length < 6) {
+    questionForm._options.push({ content: '' });
+  }
+};
+
+/**
+ * 移除选项
+ */
+const removeOption = (index) => {
+  if (questionForm._options.length > 2) {
+    // 处理答案
+    if (questionForm.questionTypeId === 1) {
+      const optionLabel = String.fromCharCode(65 + index);
+      if (questionForm.correctAnswer === optionLabel) {
+        questionForm.correctAnswer = '';
+      }
+    } else if (questionForm.questionTypeId === 2) {
+      const optionLabel = String.fromCharCode(65 + index);
+      const answerIndex = questionForm._answerArray.indexOf(optionLabel);
+      if (answerIndex !== -1) {
+        questionForm._answerArray.splice(answerIndex, 1);
+      }
+    }
+    
+    // 删除选项
+    questionForm._options.splice(index, 1);
+    
+    // 更新多选答案中的选项
+    if (questionForm.questionTypeId === 2) {
+      const newAnswerArray = [];
+      questionForm._answerArray.forEach(answer => {
+        const answerIndex = answer.charCodeAt(0) - 65;
+        if (answerIndex < index) {
+          newAnswerArray.push(answer);
+        } else if (answerIndex > index) {
+          newAnswerArray.push(String.fromCharCode(answer.charCodeAt(0) - 1));
+        }
+      });
+      questionForm._answerArray = newAnswerArray;
+    }
+  }
+};
+
+/**
+ * 提交题目表单
+ */
+const submitQuestionForm = async () => {
+  if (!questionFormRef.value) return;
+  
+  // 检查选项是否为空
+  let hasEmptyOption = false;
+  if (questionForm.questionTypeId === 1 || questionForm.questionTypeId === 2) {
+    questionForm._options.forEach(option => {
+      if (!option.content.trim()) {
+        hasEmptyOption = true;
+      }
+    });
+    
+    if (hasEmptyOption) {
+      ElMessage.error('选项内容不能为空');
+      return;
+    }
+  }
+  
+  // 检查单选/多选题是否选择了答案
+  if (questionForm.questionTypeId === 1 && !questionForm.correctAnswer) {
+    ElMessage.error('请选择正确答案');
+    return;
+  }
+  
+  if (questionForm.questionTypeId === 2 && (!questionForm._answerArray || questionForm._answerArray.length === 0)) {
+    ElMessage.error('请至少选择一个正确答案');
+    return;
+  }
+  
+  // 确保设置了课程ID
+  if (!questionForm.courseId) {
+    questionForm.courseId = currentCourse.value.courseId;
+  }
+  
+  // 更新选项JSON数据
+  if (questionForm.questionTypeId === 1 || questionForm.questionTypeId === 2) {
+    questionForm.options = JSON.stringify(questionForm._options.map((item, index) => ({
+      key: String.fromCharCode(65 + index),
+      value: item.content
+    })));
+  }
+  
+  await questionFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        if (questionForm.questionId) {
+          // 编辑试题
+          await updateQuestion(questionForm);
+          ElMessage.success('更新试题成功');
+        } else {
+          // 添加试题
+          await addQuestion(questionForm);
+          ElMessage.success('添加试题成功');
+        }
+        questionEditDialog.visible = false;
+        
+        // 刷新题库列表
+        fetchQuestionList();
+      } catch (error) {
+        console.error('保存试题失败', error);
+        ElMessage.error('保存试题失败: ' + (error.message || '未知错误'));
+      }
+    }
+  });
+};
+
+/**
+ * 加载题目类型列表
+ */
+const loadQuestionTypes = async () => {
+  try {
+    const response = await getQuestionTypeList();
+    if (response.code === 200 && response.data) {
+      questionTypeOptions.value = response.data.rows;
+    } else {
+      throw new Error(response.msg || '获取题目类型列表返回数据格式错误');
+    }
+  } catch (error) {
+    console.error('获取题目类型列表失败', error);
+    ElMessage.error('获取题目类型列表失败: ' + (error.message || '未知错误'));
+    questionTypeOptions.value = [];
+  }
+};
+
+/**
+ * 关闭题目预览对话框
+ */
+const handleCloseQuestionPreview = () => {
+  questionPreviewDialog.visible = false;
+  currentQuestion.questionId = undefined;
+  currentQuestion.questionTypeId = undefined;
+  currentQuestion.typeName = '';
+  currentQuestion.questionContent = '';
+  currentQuestion.options = [];
+  currentQuestion.correctAnswer = '';
+  currentQuestion.explanation = '';
+  currentQuestion.difficulty = '';
+};
+
+/**
+ * 格式化正确答案
+ */
+const formatCorrectAnswer = (answer) => {
+  if (!answer) return '未设置';
+  
+  try {
+    // 如果是多选题答案格式，可能是"ABC"这样的字符串，或者JSON数组
+    if (answer.length > 1 && /^[A-Z]+$/.test(answer)) {
+      // 如果是"ABC"这样的字符串，直接以逗号分隔显示
+      return answer.split('').join(', ');
+    } else if (answer.startsWith('[') && answer.endsWith(']')) {
+      // 如果是JSON格式的多选题答案，尝试解析并格式化
+      const answerArray = JSON.parse(answer);
+      if (Array.isArray(answerArray)) {
+        return answerArray.map(item => {
+          // 如果数组元素是数字，转为字母
+          if (!isNaN(item)) {
+            return String.fromCharCode(65 + parseInt(item));
+          }
+          return item;
+        }).join(', ');
+      }
+    }
+    
+    // 单选题，如果是数字，转为对应字母
+    if (!isNaN(answer) && answer.length === 1) {
+      return String.fromCharCode(65 + parseInt(answer));
+    }
+    
+    // 如果不是上述情况，直接返回答案
+    return answer;
+  } catch (error) {
+    console.error('格式化答案出错', error);
+    return answer;
+  }
+};
+
+/**
+ * 处理题库删除
+ */
+const deleteQuestion = (question) => {
+  ElMessageBox.confirm(
+    `确定要删除试题"${formatQuestionContent(question.questionContent)}"吗？`,
+    '警告',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  ).then(async () => {
+    try {
+      await deleteQuestionApi(question.questionId);
+      ElMessage.success('试题删除成功');
+      
+      // 确保查询参数中包含课程ID
+      questionQueryParams.courseId = currentCourse.value.courseId;
+      
+      // 刷新题库列表
+      fetchQuestionList();
+    } catch (error) {
+      console.error('删除试题失败', error);
+      ElMessage.error('删除试题失败: ' + (error.message || '未知错误'));
+    }
+  }).catch(() => {
+    // 取消删除
+  });
+};
+
+/**
+ * 处理题库格式化
+ */
+const formatQuestionContent = (content) => {
+  if (!content) return '';
+  
+  // 移除HTML标签并截取部分内容
+  const plainText = content.replace(/<[^>]+>/g, '');
+  
+  // 如果内容过长，截取前100个字符并添加省略号
+  if (plainText.length > 100) {
+    return plainText.substring(0, 100) + '...';
+  }
+  
+  return plainText;
+};
+
+/**
+ * 获取题目难度标签类型
+ */
+const getDifficultyTag = (difficulty) => {
+  switch (difficulty) {
+    case 'easy': return 'success';
+    case 'medium': return 'warning';
+    case 'hard': return 'danger';
+    default: return 'info';
+  }
+};
+
+/**
+ * 获取题目难度标签文本
+ */
+const getDifficultyLabel = (difficulty) => {
+  switch (difficulty) {
+    case 'easy': return '简单';
+    case 'medium': return '中等';
+    case 'hard': return '困难';
+    default: return '未知';
+  }
+};
+
+// 打开创建作业对话框
+const openCreateAssignmentDialog = () => {
+  assignmentDialog.visible = true
+  assignmentDialog.title = '发布作业'
+  resetAssignmentForm()
+  
+  // 确保在重置表单后设置课程ID
+  if (currentCourse.value && currentCourse.value.courseId) {
+    assignmentForm.courseId = currentCourse.value.courseId
+    console.log('设置courseId:', assignmentForm.courseId) // 添加日志便于调试
+  }
+  
+  // 设置默认发布时间为当前时间
+  const now = new Date()
+  assignmentForm.startTime = now.getFullYear() + '-' + 
+    String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+    String(now.getDate()).padStart(2, '0') + 'T' + 
+    String(now.getHours()).padStart(2, '0') + ':' + 
+    String(now.getMinutes()).padStart(2, '0') + ':' + 
+    String(now.getSeconds()).padStart(2, '0')
+  
+  // 设置默认截止时间为7天后
+  const endDate = new Date()
+  endDate.setDate(endDate.getDate() + 7)
+  assignmentForm.dueTime = endDate.getFullYear() + '-' + 
+    String(endDate.getMonth() + 1).padStart(2, '0') + '-' + 
+    String(endDate.getDate()).padStart(2, '0') + 'T' + 
+    String(endDate.getHours()).padStart(2, '0') + ':' + 
+    String(endDate.getMinutes()).padStart(2, '0') + ':' + 
+    String(endDate.getSeconds()).padStart(2, '0')
+    
+  // 加载课程题库选项
+  loadCourseQuestionOptions()
+}
+
+// 重置作业表单
+const resetAssignmentForm = () => {
+  assignmentForm.assignmentId = undefined
+  assignmentForm.title = ''
+  assignmentForm.content = ''
+  assignmentForm.questionIds = []
+  assignmentForm.totalPoints = 100
+  assignmentForm.startTime = ''
+  assignmentForm.dueTime = ''
+  assignmentForm.fileRequirements = ''
+  assignmentForm.publicScore = true
+  
+  if (assignmentFormRef.value) {
+    assignmentFormRef.value.resetFields()
+  }
+}
+
+// 加载作业列表
+const loadAssignmentList = async () => {
+  if (!currentCourse.value || !currentCourse.value.courseId) return
+  
+  assignmentLoading.value = true
+  assignmentQueryParams.courseId = currentCourse.value.courseId
+  
+  try {
+    console.log('正在加载课程ID为', currentCourse.value.courseId, '的作业列表')
+    const response = await getAssignmentList(assignmentQueryParams)
+    assignmentList.value = response.data.rows || []
+    assignmentTotal.value = response.data.total || 0
+    console.log('加载到作业:', assignmentList.value.length, '条')
+  } catch (error) {
+    console.error('获取作业列表失败', error)
+    ElMessage.error('获取作业列表失败')
+  } finally {
+    assignmentLoading.value = false
+  }
+}
+
+// 加载课程题库选项
+const loadCourseQuestionOptions = async () => {
+  if (!currentCourse.value || !currentCourse.value.courseId) return
+  
+  questionSelectLoading.value = true
+  try {
+    const params = {
+      pageNum: 1,
+      pageSize: 100, // 获取更多题目供选择
+      courseId: currentCourse.value.courseId
+    }
+    console.log('正在加载课程ID为', currentCourse.value.courseId, '的题库')
+    const response = await getQuestionList(params)
+    courseQuestionOptions.value = (response.data.rows || []).map(item => ({
+      questionId: item.questionId,
+      questionTitle: item.questionContent.replace(/<[^>]+>/g, '').substring(0, 50) + (item.questionContent.length > 50 ? '...' : ''),
+      typeName: item.typeName,
+      difficulty: item.difficulty
+    }))
+    console.log('加载到题目:', courseQuestionOptions.value.length, '条')
+  } catch (error) {
+    console.error('获取课程题库失败', error)
+    ElMessage.error('获取课程题库失败')
+  } finally {
+    questionSelectLoading.value = false
+  }
+}
+
+// 提交作业表单
+const submitAssignmentForm = async () => {
+  if (!assignmentFormRef.value) return
+  
+  // 确保 courseId 正确设置
+  if (!assignmentForm.courseId && currentCourse.value && currentCourse.value.courseId) {
+    assignmentForm.courseId = currentCourse.value.courseId
+  }
+  
+  await assignmentFormRef.value.validate(async (valid) => {
+    if (valid) {
+      // 校验截止时间必须大于发布时间
+      const startTime = new Date(assignmentForm.startTime).getTime()
+      const dueTime = new Date(assignmentForm.dueTime).getTime()
+      
+      if (dueTime <= startTime) {
+        ElMessage.error('截止时间必须晚于发布时间')
+        return
+      }
+      
+      // 确保提交前 courseId 已设置
+      if (!assignmentForm.courseId) {
+        ElMessage.error('课程ID不能为空')
+        return
+      }
+      
+      assignmentSubmitLoading.value = true
+      try {
+        if (assignmentForm.assignmentId) {
+          // 修改
+          await updateAssignment(assignmentForm)
+          ElMessage.success('修改成功')
+        } else {
+          // 新增
+          await addAssignment(assignmentForm)
+          ElMessage.success('发布成功')
+        }
+        assignmentDialog.visible = false
+        loadAssignmentList()
+      } catch (error) {
+        console.error('保存作业失败', error)
+        ElMessage.error('保存作业失败')
+      } finally {
+        assignmentSubmitLoading.value = false
+      }
+    }
+  })
+}
+
+// 分页大小变化
+const handleAssignmentSizeChange = (size) => {
+  assignmentQueryParams.pageSize = size
+  loadAssignmentList()
+}
+
+// 页码变化
+const handleAssignmentCurrentChange = (current) => {
+  assignmentQueryParams.pageNum = current
+  loadAssignmentList()
+}
+
+// 查看作业详情
+const viewAssignment = (row) => {
+  router.push(`/exam/assignment/detail/${row.assignmentId}`)
+}
+
+// 编辑作业
+const editAssignment = async (row) => {
+  assignmentDialog.visible = true
+  assignmentDialog.title = '修改作业'
+  resetAssignmentForm()
+  
+  try {
+    assignmentLoading.value = true
+    const response = await getAssignmentInfo(row.assignmentId)
+    Object.assign(assignmentForm, response.data)
+    // 加载课程题库选项
+    await loadCourseQuestionOptions()
+  } catch (error) {
+    console.error('获取作业详情失败', error)
+    ElMessage.error('获取作业详情失败')
+  } finally {
+    assignmentLoading.value = false
+  }
+}
+
+// 批阅作业
+const reviewAssignment = (row) => {
+  router.push(`/exam/assignment/submission/${row.assignmentId}`)
+}
+
+// 删除作业
+const deleteAssignment = (row) => {
+  ElMessageBox.confirm(`确定要删除作业"${row.title}"吗？`, '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+    .then(async () => {
+      try {
+        await deleteAssignmentApi(row.assignmentId)
+        ElMessage.success('删除成功')
+        loadAssignmentList()
+      } catch (error) {
+        console.error('删除作业失败', error)
+        ElMessage.error('删除作业失败')
+      }
+    })
+    .catch(() => {})
+}
+
+// 状态标签样式
+const getAssignmentStatusTag = (status) => {
+  switch (status) {
+    case 1: return 'success'
+    case 2: return 'danger'
+    default: return 'info'
+  }
+}
+
+// 状态标签文本
+const getAssignmentStatusLabel = (status) => {
+  switch (status) {
+    case 1: return '进行中'
+    case 2: return '已截止'
+    default: return '未知'
+  }
+}
+
+// 页面初始化
+onMounted(() => {
+  getList();
+  loadResourceTypeList(); // 加载资源类型列表
+});
+
+// 关联题目对话框
+const questionAssociateDialog = reactive({
+  visible: false,
+  title: '关联题目',
+  assignmentId: null,
+  assignmentTitle: ''
+})
+
+// 已选择的题目列表
+const selectedQuestions = ref([])
+// 总分
+const totalPoints = ref(0)
+// 当前正在处理的作业
+const currentAssignment = ref({})
+// 保存状态
+const savingAssociation = ref(false)
+
+// 题库池
+const questionPool = ref([])
+const questionPoolLoading = ref(false)
+const questionPoolTotal = ref(0)
+const questionSearchKeyword = ref('')
+const questionPoolQuery = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  courseId: undefined,
+  questionContent: ''
+})
+
+// 已选择的题目(用于表格多选)
+const multipleSelection = ref([])
+
+// 打开关联题目对话框
+const associateQuestions = async (assignment) => {
+  // 保存当前作业信息
+  currentAssignment.value = assignment
+  
+  // 初始化对话框
+  questionAssociateDialog.visible = true
+  questionAssociateDialog.title = `关联题目 - ${assignment.title}`
+  questionAssociateDialog.assignmentId = assignment.assignmentId
+  
+  // 重置选择状态
+  selectedQuestions.value = []
+  
+  try {
+    // 获取作业已关联的题目
+    const response = await getAssignmentQuestions(assignment.assignmentId)
+    if (response.data && Array.isArray(response.data)) {
+      // 转换后端返回的数据格式
+      selectedQuestions.value = response.data.map(item => ({
+        ...item,
+        points: item.points || 5 // 默认分值为5
+      }))
+      
+      // 计算总分
+      calculateTotalPoints()
+    }
+    
+    // 加载课程题库
+    loadQuestionPool()
+  } catch (error) {
+    console.error('获取作业关联题目失败', error)
+    ElMessage.error('获取作业关联题目失败')
+  }
+}
+
+// 计算总分
+const calculateTotalPoints = () => {
+  totalPoints.value = selectedQuestions.value.reduce((total, item) => {
+    return total + (Number(item.points) || 0)
+  }, 0)
+}
+
+// 加载题库池
+const loadQuestionPool = async () => {
+  if (!currentCourse.value || !currentCourse.value.courseId) {
+    ElMessage.warning('课程信息无效')
+    return
+  }
+  
+  questionPoolLoading.value = true
+  
+  try {
+    // 设置查询参数
+    questionPoolQuery.courseId = currentCourse.value.courseId
+    questionPoolQuery.questionContent = questionSearchKeyword.value
+    
+    const response = await getQuestionList(questionPoolQuery)
+    
+    if (response.data && response.data.rows) {
+      // 过滤掉已经选择的题目
+      const selectedIds = selectedQuestions.value.map(q => q.questionId)
+      questionPool.value = response.data.rows.filter(q => !selectedIds.includes(q.questionId))
+      questionPoolTotal.value = response.data.total || 0
+    } else {
+      questionPool.value = []
+      questionPoolTotal.value = 0
+    }
+  } catch (error) {
+    console.error('加载题库失败', error)
+    ElMessage.error('加载题库失败')
+    questionPool.value = []
+    questionPoolTotal.value = 0
+  } finally {
+    questionPoolLoading.value = false
+  }
+}
+
+// 搜索题库
+const searchQuestionsInPool = () => {
+  questionPoolQuery.pageNum = 1
+  questionPoolQuery.questionContent = questionSearchKeyword.value
+  loadQuestionPool()
+}
+
+// 处理题目选择变化
+const handleQuestionSelectionChange = (selection) => {
+  multipleSelection.value = selection
+}
+
+// 添加题目到已选列表
+const addQuestionToSelected = (question) => {
+  // 检查是否已经存在
+  const exists = selectedQuestions.value.some(q => q.questionId === question.questionId)
+  if (exists) {
+    ElMessage.warning('该题目已添加')
+    return
+  }
+  
+  // 添加到已选列表，附带默认分值
+  selectedQuestions.value.push({
+    ...question,
+    points: 5, // 默认分值为5
+    questionOrder: selectedQuestions.value.length + 1
+  })
+  
+  // 从题库池中移除
+  questionPool.value = questionPool.value.filter(q => q.questionId !== question.questionId)
+  
+  // 更新总分
+  calculateTotalPoints()
+  
+  // 提示
+  ElMessage.success('添加题目成功')
+}
+
+// 批量添加选中的题目
+const addSelectedQuestions = () => {
+  if (multipleSelection.value.length === 0) {
+    ElMessage.warning('请先选择题目')
+    return
+  }
+  
+  // 批量添加所选题目
+  multipleSelection.value.forEach(question => {
+    // 检查是否已经存在
+    const exists = selectedQuestions.value.some(q => q.questionId === question.questionId)
+    if (!exists) {
+      selectedQuestions.value.push({
+        ...question,
+        points: 5, // 默认分值为5
+        questionOrder: selectedQuestions.value.length + 1
+      })
+      
+      // 从题库池中移除
+      questionPool.value = questionPool.value.filter(q => q.questionId !== question.questionId)
+    }
+  })
+  
+  // 更新总分
+  calculateTotalPoints()
+  
+  // 提示
+  ElMessage.success(`添加 ${multipleSelection.value.length} 道题目成功`)
+  
+  // 清空选择
+  multipleSelection.value = []
+}
+
+// 移除已选题目
+const removeSelectedQuestion = (index) => {
+  // 获取要移除的题目
+  const removedQuestion = selectedQuestions.value[index]
+  
+  // 从已选列表中移除
+  selectedQuestions.value.splice(index, 1)
+  
+  // 如果该题目是当前课程的，重新添加到题库池中
+  if (removedQuestion.courseId === currentCourse.value.courseId) {
+    questionPool.value.unshift(removedQuestion)
+  }
+  
+  // 更新总分
+  calculateTotalPoints()
+  
+  // 重新排序
+  selectedQuestions.value.forEach((item, idx) => {
+    item.questionOrder = idx + 1
+  })
+}
+
+// 题库分页大小变化
+const handleQuestionPoolSizeChange = (size) => {
+  questionPoolQuery.pageSize = size
+  loadQuestionPool()
+}
+
+// 题库页码变化
+const handleQuestionPoolCurrentChange = (current) => {
+  questionPoolQuery.pageNum = current
+  loadQuestionPool()
+}
+
+// 保存题目关联
+const saveQuestionAssociation = async () => {
+  if (selectedQuestions.value.length === 0) {
+    ElMessage.warning('请至少选择一道题目')
+    return
+  }
+  
+  savingAssociation.value = true
+  
+  try {
+    // 准备要提交的数据
+    const assignmentQuestions = selectedQuestions.value.map((item, index) => ({
+      assignmentId: questionAssociateDialog.assignmentId,
+      questionId: item.questionId,
+      questionOrder: index + 1,
+      points: item.points || 5
+    }))
+    
+    // 调用保存API
+    await saveAssignmentQuestions(questionAssociateDialog.assignmentId, assignmentQuestions)
+    
+    // 更新当前作业的总分
+    if (currentAssignment.value) {
+      currentAssignment.value.totalPoints = totalPoints.value
+      // 刷新作业列表
+      loadAssignmentList()
+    }
+    
+    // 提示成功
+    ElMessage.success('保存题目关联成功')
+    
+    // 关闭对话框
+    questionAssociateDialog.visible = false
+  } catch (error) {
+    console.error('保存题目关联失败', error)
+    ElMessage.error('保存题目关联失败')
+  } finally {
+    savingAssociation.value = false
+  }
+}
+
+// 格式化题目内容，处理HTML标签等
+const formatQuestionContent = (content) => {
+  if (!content) return ''
+  
+  // 截取内容，防止显示过长
+  if (content.length > 150) {
+    content = content.substring(0, 150) + '...'
+  }
+  
+  // 处理HTML标签安全性
+  return content.replace(/<[^>]*>/g, match => {
+    // 允许部分安全标签
+    if (/<\/?(?:b|strong|i|em|u|span|p|div|h[1-6]|br)/.test(match)) {
+      return match
+    }
+    return ''
+  })
+}
+
+// 获取难度标签类型
+const getDifficultyTag = (difficulty) => {
+  switch (difficulty) {
+    case 1: return 'success' // 简单
+    case 2: return 'warning' // 中等
+    case 3: return 'danger'  // 困难
+    default: return 'info'   // 默认
+  }
+}
+
+// 获取难度标签文本
+const getDifficultyLabel = (difficulty) => {
+  switch (difficulty) {
+    case 1: return '简单'
+    case 2: return '中等'
+    case 3: return '困难'
+    default: return '未知'
+  }
+}
+
+/* 题库池表格底部 */
+.table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background-color: #f8f9fb;
+  border-top: 1px solid #ebeef5;
+}
+
+/* 增强题目表格样式 */
+:deep(.question-pool-panel .el-table) {
+  --el-table-header-bg-color: #f8f9fb;
+  --el-table-header-text-color: #606266;
+  --el-table-header-font-weight: 600;
+  --el-table-row-hover-bg-color: #f0f7ff;
+}
+
+:deep(.el-input-number--small) {
+  width: 90px;
+}
+</style> 

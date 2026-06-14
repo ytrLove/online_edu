@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.mapper.ExamAssignmentSubmissionMapper">
+
+    <resultMap id="SubmissionResultMap" type="com.exam.model.entity.ExamAssignmentSubmission">
+        <id property="submissionId" column="submission_id"/>
+        <result property="assignmentId" column="assignment_id"/>
+        <result property="studentId" column="student_id"/>
+        <result property="submissionTime" column="submission_time"/>
+        <result property="status" column="status"/>
+        <result property="feedback" column="feedback"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="assignmentTitle" column="assignment_title"/>
+        <result property="studentName" column="student_name"/>
+        <result property="totalScore" column="total_score"/>
+    </resultMap>
+
+    <sql id="selectSubmissionVo">
+        select s.submission_id, s.assignment_id, s.student_id, s.submission_time,
+               s.status, s.total_score, s.feedback, s.create_time, s.update_time,
+               a.title as assignment_title, a.total_points as assignment_points, c.course_name as course_info, u.username as student_name
+        from exam_assignment_submission s
+        left join exam_assignment a on s.assignment_id = a.assignment_id
+        left join edu_course c on a.course_id = c.course_id
+        left join edu_student st on s.student_id = st.student_id
+        left join sys_user u on st.user_id = u.user_id
+    </sql>
+
+    <select id="selectSubmissionPage" resultMap="SubmissionResultMap">
+        <include refid="selectSubmissionVo"/>
+        <where>
+            <if test="submission != null">
+                <if test="submission.assignmentId != null">
+                    AND s.assignment_id = #{submission.assignmentId}
+                </if>
+                <if test="submission.studentId != null">
+                    AND s.student_id = #{submission.studentId}
+                </if>
+                <if test="submission.status != null and submission.status != ''">
+                    AND s.status = #{submission.status}
+                </if>
+            </if>
+        </where>
+        order by s.create_time desc
+    </select>
+
+    <select id="selectTeacherSubmissionPage" resultMap="SubmissionResultMap">
+        <include refid="selectSubmissionVo"/>
+        <where>
+            a.teacher_id = #{teacherId}
+            <if test="submission != null">
+                <if test="submission.assignmentId != null">
+                    AND s.assignment_id = #{submission.assignmentId}
+                </if>
+                <if test="submission.studentId != null">
+                    AND s.student_id = #{submission.studentId}
+                </if>
+                <if test="submission.status != null and submission.status != ''">
+                    AND s.status = #{submission.status}
+                </if>
+            </if>
+        </where>
+        order by s.create_time desc
+    </select>
+
+    <select id="selectSubmissionById" resultMap="SubmissionResultMap">
+        <include refid="selectSubmissionVo"/>
+        where s.submission_id = #{submissionId}
+    </select>
+
+    <select id="selectStudentSubmissionPage" resultMap="SubmissionResultMap">
+        <include refid="selectSubmissionVo"/>
+        <where>
+            s.student_id = #{studentId}
+            <if test="submission != null">
+                <if test="submission.assignmentId != null">
+                    AND s.assignment_id = #{submission.assignmentId}
+                </if>
+                <if test="submission.status != null">
+                    AND s.status = #{submission.status}
+                </if>
+            </if>
+        </where>
+        ORDER BY s.create_time DESC
+    </select>
+
+    <select id="selectStudentSubmissionByAssignmentId" resultMap="SubmissionResultMap">
+        <include refid="selectSubmissionVo"/>
+        where s.assignment_id = #{assignmentId} and s.student_id = #{studentId}
+    </select>
+
+    <select id="selectByStudentAndAssignment" resultMap="SubmissionResultMap">
+        <include refid="selectSubmissionVo"/>
+        where s.student_id = #{studentId} and s.assignment_id = #{assignmentId}
+    </select>
+
+    <select id="selectSubmissionStatsByAssignmentId" resultMap="SubmissionResultMap">
+        <include refid="selectSubmissionVo"/>
+        where s.assignment_id = #{assignmentId}
+    </select>
+
+    <select id="countByAssignmentId" resultType="int">
+        select count(*) from exam_assignment_submission where assignment_id = #{assignmentId}
+    </select>
+
+</mapper> 

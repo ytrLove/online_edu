@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.stat.mapper.LearningSummaryMapper">
+
+    <!-- 学习情况汇总结果映射 -->
+    <resultMap id="SummaryResultMap" type="com.stat.model.entity.LearningSummary">
+        <id property="summaryId" column="summary_id"/>
+        <result property="studentId" column="student_id"/>
+        <result property="courseId" column="course_id"/>
+        <result property="totalStudyTime" column="total_study_time"/>
+        <result property="examAvgScore" column="exam_avg_score"/>
+        <result property="assignmentCompletion" column="assignment_completion"/>
+        <result property="lastActiveTime" column="last_active_time"/>
+        <!-- 关联字段 -->
+        <result property="studentName" column="student_name"/>
+        <result property="courseName" column="course_name"/>
+    </resultMap>
+
+    <!-- 获取学习情况汇总分页列表 -->
+    <select id="selectSummaryPage" resultMap="SummaryResultMap">
+        SELECT 
+            s.*,
+            u.nickname as student_name,
+            c.course_name
+        FROM stat_learning_summary s
+        LEFT JOIN sys_user u ON s.student_id = u.user_id
+        LEFT JOIN edu_course c ON s.course_id = c.course_id
+        <where>
+            <if test="studentName != null and studentName != ''">
+                AND u.nickname LIKE CONCAT('%', #{studentName}, '%')
+            </if>
+            <if test="startTime != null">
+                AND s.last_active_time >= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND s.last_active_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY s.last_active_time DESC
+    </select>
+
+    <!-- 获取学生的学习情况详情 -->
+    <select id="selectStudentSummary" resultType="java.util.HashMap">
+        SELECT 
+            COUNT(DISTINCT s.course_id) as totalCourses,
+            SUM(s.total_study_time) as totalStudyTime,
+            ROUND(AVG(s.assignment_completion), 2) as avgCompletionRate,
+            ROUND(AVG(s.exam_avg_score), 1) as avgScore,
+            MAX(s.last_active_time) as lastActiveTime
+        FROM stat_learning_summary s
+        WHERE s.student_id = #{studentId}
+    </select>
+
+    <!-- 获取课程的学习情况统计 -->
+    <select id="selectCourseSummary" resultType="java.util.HashMap">
+        SELECT 
+            COUNT(DISTINCT s.student_id) as totalStudents,
+            ROUND(AVG(s.total_study_time), 2) as avgStudyTime,
+            ROUND(AVG(s.assignment_completion), 2) as avgCompletionRate,
+            ROUND(AVG(s.exam_avg_score), 1) as avgScore,
+            COUNT(CASE WHEN s.assignment_completion >= 100 THEN 1 END) as completedCount
+        FROM stat_learning_summary s
+        WHERE s.course_id = #{courseId}
+    </select>
+
+    <!-- 获取学生的课程学习概要 -->
+    <select id="selectByStudentAndCourse" resultMap="SummaryResultMap">
+        SELECT 
+            s.*,
+            u.nickname as student_name,
+            c.course_name
+        FROM stat_learning_summary s
+        LEFT JOIN sys_user u ON s.student_id = u.user_id
+        LEFT JOIN edu_course c ON s.course_id = c.course_id
+        WHERE s.student_id = #{studentId}
+        AND s.course_id = #{courseId}
+        LIMIT 1
+    </select>
+
+    <!-- 获取学生的所有课程学习概要 -->
+    <select id="selectByStudentId" resultMap="SummaryResultMap">
+        SELECT 
+            s.*,
+            u.nickname as student_name,
+            c.course_name
+        FROM stat_learning_summary s
+        LEFT JOIN sys_user u ON s.student_id = u.user_id
+        LEFT JOIN edu_course c ON s.course_id = c.course_id
+        WHERE s.student_id = #{studentId}
+        ORDER BY s.last_active_time DESC
+    </select>
+
+    <!-- 分页查询课程的学习概要 -->
+    <select id="selectByCourseId" resultMap="SummaryResultMap">
+        SELECT 
+            s.*,
+            u.nickname as student_name,
+            c.course_name
+        FROM stat_learning_summary s
+        LEFT JOIN sys_user u ON s.student_id = u.user_id
+        LEFT JOIN edu_course c ON s.course_id = c.course_id
+        WHERE s.course_id = #{courseId}
+        ORDER BY s.last_active_time DESC
+    </select>
+
+    <!-- 生成学习情况汇总 -->
+    <insert id="generateSummary">
+        INSERT INTO stat_learning_summary (
+            student_id,
+            course_id,
+            total_study_time,
+            exam_avg_score,
+            assignment_completion,
+            last_active_time
+        )
+        SELECT 
+            cs.student_id,
+            cs.course_id,
+            COALESCE(SUM(lb.duration), 0) as total_study_time,
+            COALESCE(
+                (
+                    SELECT AVG(ea.score)
+                    FROM exam_paper ep 
+                    JOIN exam_record er ON ep.exam_id = er.exam_id
+                    JOIN exam_answer ea ON er.record_id = ea.record_id
+                    WHERE ep.course_id = cs.course_id 
+                    AND er.student_id = cs.student_id
+                ), 
+                0
+            ) as exam_avg_score,
+            ROUND(
+                (
+                    COUNT(DISTINCT CASE WHEN lb.behavior_type = 'complete_resource' THEN lb.resource_id END) * 100.0
+                ) / 
+                NULLIF(
+                    (
+                        SELECT COUNT(DISTINCT tr.resource_id) 
+                        FROM edu_teaching_resource tr 
+                        WHERE tr.course_id = cs.course_id
+                    ),
+                    0
+                ),
+                2
+            ) as assignment_completion,
+            MAX(lb.create_time) as last_active_time
+        FROM edu_course_student cs
+        LEFT JOIN stat_learning_behavior lb ON cs.student_id = lb.student_id 
+            AND cs.course_id = lb.course_id
+        <where>
+            <if test="studentId != null">
+                AND cs.student_id = #{studentId}
+            </if>
+            <if test="courseId != null">
+                AND cs.course_id = #{courseId}
+            </if>
+            <if test="startTime != null">
+                AND lb.create_time >= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND lb.create_time &lt;= #{endTime}
+            </if>
+        </where>
+        GROUP BY cs.student_id, cs.course_id
+        ON DUPLICATE KEY UPDATE
+            total_study_time = VALUES(total_study_time),
+            exam_avg_score = VALUES(exam_avg_score),
+            assignment_completion = VALUES(assignment_completion),
+            last_active_time = VALUES(last_active_time)
+    </insert>
+
+</mapper> 

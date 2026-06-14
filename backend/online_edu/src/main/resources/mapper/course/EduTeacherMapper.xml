@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.course.mapper.EduTeacherMapper">
+
+    <resultMap type="com.course.model.entity.EduTeacher" id="EduTeacherResult">
+        <id property="teacherId" column="teacher_id"/>
+        <result property="teacherCode" column="teacher_code"/>
+        <result property="department" column="department"/>
+        <result property="position" column="position"/>
+        <result property="employmentStatus" column="employment_status"/>
+        <result property="hireDate" column="hire_date"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <!-- 关联用户信息 -->
+        <result property="nickname" column="nickname"/>
+        <result property="avatar" column="avatar"/>
+        <result property="username" column="username"/>
+        <result property="email" column="email"/>
+        <result property="phone" column="phone"/>
+    </resultMap>
+    
+    <select id="selectTeachersWithUserInfo" resultMap="EduTeacherResult">
+        select t.*, u.nickname, u.avatar, u.username, u.email, u.phone
+        from edu_teacher t
+        left join sys_user u on t.user_id = u.user_id
+        order by t.create_time desc
+    </select>
+    
+    <select id="selectTeacherWithUserInfoById" parameterType="Long" resultMap="EduTeacherResult">
+        select t.*, u.nickname, u.avatar, u.username, u.email, u.phone
+        from edu_teacher t
+        left join sys_user u on t.user_id = u.user_id
+        where t.teacher_id = #{teacherId}
+    </select>
+</mapper> 

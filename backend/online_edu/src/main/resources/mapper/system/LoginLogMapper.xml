@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.user.mapper.LoginLogMapper">
+
+    <!-- 常见问题区域 -->
+    <select id="selectLoginLogs" resultType="com.user.model.entity.LoginLog">
+        SELECT * FROM sys_login_log
+        <where>
+            <!-- 检查这里的条件语句 -->
+            <if test="username != null and username != ''">
+                AND username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <!-- 特别注意 & 符号必须转义为 &amp; -->
+            <if test="status != null">
+                AND status = #{status} <!-- 正确转义 -->
+            </if>
+            <if test="startTime != null">
+                AND login_time &gt;= #{startTime} <!-- 正确转义 -->
+            </if>
+            <if test="endTime != null">
+                AND login_time &lt;= #{endTime} <!-- 正确转义 -->
+            </if>
+        </where>
+        ORDER BY login_time DESC
+    </select>
+</mapper>

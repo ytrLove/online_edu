@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.course.mapper.EduSectionMapper">
+
+    <resultMap id="SectionResultMap" type="com.course.model.entity.EduSection">
+        <id column="section_id" property="sectionId"/>
+        <result column="chapter_id" property="chapterId"/>
+        <result column="title" property="title"/>
+        <result column="content" property="content"/>
+        <result column="video_url" property="videoUrl"/>
+        <result column="duration" property="duration"/>
+        <result column="image_url" property="imageUrl"/>
+        <result column="resource_type" property="resourceType"/>
+        <result column="free_preview" property="freePreview"/>
+        <result column="sort" property="sort"/>
+        <result column="status" property="status"/>
+        <result column="del_flag" property="delFlag"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="remark" property="remark"/>
+        <result column="chapter_title" property="chapterTitle"/>
+    </resultMap>
+
+    <sql id="selectSectionVo">
+        select s.section_id, s.chapter_id, s.title, s.content, s.video_url, s.duration, s.image_url, 
+               s.resource_type, s.free_preview, s.sort, s.status, s.del_flag, s.create_time, s.update_time, s.remark,
+               c.title as chapter_title
+        from edu_section s
+        left join edu_chapter c on s.chapter_id = c.chapter_id
+    </sql>
+
+    <select id="selectSectionsByChapterId" parameterType="Long" resultMap="SectionResultMap">
+        <include refid="selectSectionVo"/>
+        where s.chapter_id = #{chapterId} and s.del_flag = 0
+        order by s.sort, s.create_time
+    </select>
+
+    <select id="selectSectionsByCourseId" parameterType="Long" resultMap="SectionResultMap">
+        <include refid="selectSectionVo"/>
+        left join edu_chapter c2 on s.chapter_id = c2.chapter_id
+        where c2.course_id = #{courseId} and s.del_flag = 0
+        order by c2.sort, s.sort, s.create_time
+    </select>
+
+    <select id="selectSectionPage" resultMap="SectionResultMap">
+        <include refid="selectSectionVo"/>
+        where s.chapter_id = #{chapterId} and s.del_flag = 0
+        order by s.sort, s.create_time
+    </select>
+</mapper> 

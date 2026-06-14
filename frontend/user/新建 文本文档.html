@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能AI助手宠物</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #001510);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        header {
+            margin-bottom: 40px;
+        }
+        
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            background: linear-gradient(to right, #ff7e5f, #feb47b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 50px 0;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            transition: transform 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-10px);
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .feature-card i {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .feature-card h3 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+        }
+        
+        .feature-card p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+        
+        /* AI 宠物样式 */
+        .ai-pet {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.5s ease;
+        }
+        
+        .pet-container {
+            position: relative;
+        }
+        
+        .pet-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+            animation: float 3s ease-in-out infinite;
+            transition: all 0.3s ease;
+        }
+        
+        .pet-icon:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .pet-icon i {
+            font-size: 40px;
+            color: white;
+        }
+        
+        .speech-bubble {
+            position: absolute;
+            bottom: 100px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            padding: 12px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            width: 160px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 1s ease;
+            display: none;
+        }
+        
+        .speech-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            right: 20px;
+            border-width: 10px 10px 0;
+            border-style: solid;
+            border-color: rgba(255, 255, 255, 0.9) transparent transparent;
+        }
+        
+        /* 动画效果 */
+        @keyframes float {
+            0% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-15px);
+            }
+            100% {
+                transform: translateY(0px);
+            }
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .chat-link {
+            display: inline-block;
+            margin-top: 30px;
+            padding: 15px 40px;
+            background: linear-gradient(to right, #6a11cb, #2575fc);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(37, 117, 252, 0.4);
+        }
+        
+        .chat-link:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 30px rgba(37, 117, 252, 0.6);
+        }
+        
+        footer {
+            margin-top: 50px;
+            padding: 20px;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+            
+            .ai-pet {
+                bottom: 20px;
+                right: 20px;
+            }
+            
+            .pet-icon {
+                width: 65px;
+                height: 65px;
+            }
+            
+            .pet-icon i {
+                font-size: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>智能AI助手体验平台</h1>
+            <p class="subtitle">探索人工智能的无限可能 - 从自然语言处理到深度学习，我们的AI助手随时为您提供帮助</p>
+        </header>
+        
+        <div class="features">
+            <div class="feature-card">
+                <i class="fas fa-comments"></i>
+                <h3>智能对话</h3>
+                <p>与AI进行自然流畅的对话，获取问题解答、创意灵感或只是闲聊放松</p>
+            </div>
+            
+            <div class="feature-card">
+                <i class="fas fa-lightbulb"></i>
+                <h3>创意生成</h3>
+                <p>让AI帮助您撰写文章、生成代码、创作诗歌，激发您的无限创意</p>
+            </div>
+            
+            <div class="feature-card">
+                <i class="fas fa-robot"></i>
+                <h3>持续学习</h3>
+                <p>我们的AI模型不断学习进化，为您提供越来越准确和贴心的服务</p>
+            </div>
+        </div>
+        
+        <a href="#" class="chat-link" id="chatLink">立即开始对话</a>
+        
+        <footer>
+            <p>© 2023 智能AI助手体验平台 | 让科技服务于人类</p>
+        </footer>
+    </div>
+    
+    <!-- AI助手宠物 -->
+    <div class="ai-pet" id="aiPet">
+        <div class="pet-container">
+            <div class="speech-bubble" id="speechBubble">点击我开启AI对话！</div>
+            <div class="pet-icon">
+                <i class="fas fa-robot"></i>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const aiPet = document.getElementById('aiPet');
+            const speechBubble = document.getElementById('speechBubble');
+            const chatLink = document.getElementById('chatLink');
+            
+            // 显示对话气泡
+            setTimeout(() => {
+                speechBubble.style.display = 'block';
+            }, 2000);
+            
+            // 点击AI宠物跳转
+            aiPet.addEventListener('click', function() {
+                // 模拟跳转效果
+                this.style.transform = 'scale(1.2)';
+                this.style.opacity = '0.7';
+                
+                setTimeout(() => {
+                    alert('正在跳转到AI对话页面...');
+                    // 实际项目中这里应该是：window.location.href = "/chat";
+                }, 500);
+            });
+            
+            // 点击聊天链接跳转
+            chatLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                alert('正在跳转到AI对话页面...');
+                // 实际项目中这里应该是：window.location.href = "/chat";
+            });
+            
+            // 每10秒显示一次气泡提示
+            setInterval(() => {
+                if (Math.random() > 0.3) {
+                    speechBubble.style.display = 'block';
+                    setTimeout(() => {
+                        speechBubble.style.display = 'none';
+                    }, 3000);
+                }
+            }, 10000);
+        });
+    </script>
+</body>
+</html>

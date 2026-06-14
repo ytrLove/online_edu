@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.stat.mapper.TeachingEvaluationMapper">
+
+    <!-- 评价列表查询结果映射 -->
+    <resultMap id="EvaluationResultMap" type="com.stat.model.entity.TeachingEvaluation">
+        <id property="evaluationId" column="evaluation_id"/>
+        <result property="courseId" column="course_id"/>
+        <result property="teacherId" column="teacher_id"/>
+        <result property="studentId" column="student_id"/>
+        <result property="teachingQuality" column="teaching_quality"/>
+        <result property="contentQuality" column="content_quality"/>
+        <result property="interactionScore" column="interaction_score"/>
+        <result property="resourceQuality" column="resource_quality"/>
+        <result property="overallScore" column="overall_score"/>
+        <result property="improvementSuggest" column="improvement_suggest"/>
+        <result property="evaluateTime" column="evaluate_time"/>
+        <!-- 关联字段 -->
+        <result property="courseName" column="course_name"/>
+        <result property="teacherName" column="teacher_name"/>
+        <result property="studentName" column="student_name"/>
+    </resultMap>
+
+    <!-- 获取评价列表 -->
+    <select id="selectEvaluationPage" resultMap="EvaluationResultMap">
+        SELECT 
+            e.*,
+            c.course_name,
+            a.nickname as teacher_name,
+            u.nickname as student_name
+        FROM stat_teaching_evaluation e
+        LEFT JOIN edu_course c ON e.course_id = c.course_id
+        LEFT JOIN edu_teacher t ON e.teacher_id = t.teacher_id
+        LEFT JOIN edu_student s ON e.student_id = s.student_id
+        LEFT JOIN sys_user a ON t.user_id = a.user_id
+        LEFT JOIN sys_user u ON s.user_id = u.user_id
+        <where>
+            <if test="teacherName != null and teacherName != ''">
+                AND t.nickname LIKE CONCAT('%', #{teacherName}, '%')
+            </if>
+            <if test="startTime != null">
+                AND e.evaluate_time >= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND e.evaluate_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY e.evaluate_time DESC
+    </select>
+
+    <!-- 获取课程评价统计 -->
+    <select id="selectCourseEvaluationStats" resultType="java.util.HashMap">
+        SELECT 
+            COUNT(1) as totalEvaluations,
+            ROUND(AVG(teaching_quality), 1) as avgTeachingQuality,
+            ROUND(AVG(content_quality), 1) as avgContentQuality,
+            ROUND(AVG(interaction_score), 1) as avgInteractionScore,
+            ROUND(AVG(resource_quality), 1) as avgResourceQuality,
+            ROUND(AVG(overall_score), 1) as avgOverallScore
+        FROM stat_teaching_evaluation
+        WHERE course_id = #{courseId}
+    </select>
+
+</mapper> 

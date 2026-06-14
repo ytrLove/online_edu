@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.course.mapper.EduCourseMapper">
+
+    <resultMap type="com.course.model.entity.EduCourse" id="EduCourseResult">
+        <id property="courseId" column="course_id"/>
+        <result property="courseName" column="course_name"/>
+        <result property="courseCode" column="course_code"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="description" column="description"/>
+        <result property="objectives" column="objectives"/>
+        <result property="syllabus" column="syllabus"/>
+        <result property="coverImage" column="cover_image"/>
+        <result property="status" column="status"/>
+        <result property="enrollmentStartTime" column="enrollment_start_time"/>
+        <result property="enrollmentEndTime" column="enrollment_end_time"/>
+        <result property="enrollmentStatus" column="enrollment_status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+        <result property="teacherId" column="teacher_id"/>
+        <result property="teacher_name" column="nickname"/>
+        <result property="subjectName" column="subject_name"/>
+        <result property="studentCount" column="student_count"/>
+    </resultMap>
+
+    <!-- 添加CourseListResponse的结果映射 -->
+    <resultMap type="com.course.model.dto.response.CourseListResponse" id="CourseListResponseResult">
+        <id property="courseId" column="course_id"/>
+        <result property="courseName" column="course_name"/>
+        <result property="courseCode" column="course_code"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="description" column="description"/>
+        <result property="objectives" column="objectives"/>
+        <result property="syllabus" column="syllabus"/>
+        <result property="coverImage" column="cover_image"/>
+        <result property="status" column="status"/>
+        <result property="enrollmentStartTime" column="enrollment_start_time"/>
+        <result property="enrollmentEndTime" column="enrollment_end_time"/>
+        <result property="enrollmentStatus" column="enrollment_status"/>
+        <result property="studentCount" column="student_count"/>
+        <result property="mainTeacherName" column="teacher_name"/>
+        <result property="teacherName" column="teacher_name"/>
+        <result property="remark" column="remark"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="subjectName" column="subject_name"/>
+        <!-- 教师ID列表在Service层处理 -->
+    </resultMap>
+
+    <sql id="selectCourseVo">
+        select c.course_id, c.course_name, c.course_code, c.subject_id, c.description, c.objectives,
+               c.syllabus, c.cover_image, c.status, c.enrollment_start_time, c.enrollment_end_time,
+               c.enrollment_status, c.del_flag, c.create_time,
+               c.update_time, c.remark, s.subject_name
+        from edu_course c
+                 left join edu_subject s on c.subject_id = s.subject_id
+    </sql>
+
+    <!-- 查询课程教师ID列表 -->
+    <select id="selectCourseTeacherIds" parameterType="Long" resultType="Long">
+        SELECT teacher_id
+        FROM edu_course_teacher
+        WHERE course_id = #{courseId}
+        ORDER BY
+            CASE
+                WHEN role = 'main' THEN 0
+                ELSE 1
+                END
+    </select>
+
+    <select id="selectCourseList" parameterType="com.course.model.entity.EduCourse" resultMap="CourseListResponseResult">
+        select
+        c.course_id, c.course_name, c.course_code, c.subject_id, c.description, c.objectives,
+        c.syllabus, c.cover_image, c.status, c.enrollment_start_time, c.enrollment_end_time,
+        c.enrollment_status, c.del_flag, c.create_time,
+        c.update_time, c.remark, s.subject_name,
+        (select GROUP_CONCAT(u.nickname)
+        from sys_user u
+        where u.user_id in (
+        select t.user_id
+        from edu_course_teacher ct
+        inner join edu_teacher t on ct.teacher_id = t.teacher_id
+        where ct.course_id = c.course_id
+        and ct.role = 'main'  <!-- 只获取主讲教师 -->
+        )
+        ) as teacher_name,
+        (select count(1)
+        from edu_course_student cs
+        where cs.course_id = c.course_id
+        ) as student_count
+        from edu_course c
+        left join edu_subject s on c.subject_id = s.subject_id
+        <where>
+            c.del_flag = 0
+            <if test="course.courseName != null and course.courseName != ''">
+                AND c.course_name like concat('%', #{course.courseName}, '%')
+            </if>
+            <if test="course.courseCode != null and course.courseCode != ''">
+                AND c.course_code = #{course.courseCode}
+            </if>
+            <if test="course.subjectId != null">
+                AND c.subject_id = #{course.subjectId}
+            </if>
+            <if test="course.status != null and course.status != ''">
+                AND c.status = #{course.status}
+            </if>
+        </where>
+        order by c.create_time desc
+    </select>
+
+    <select id="selectCourseById" parameterType="Long" resultMap="EduCourseResult">
+        select
+        c.course_id, c.course_name, c.course_code, c.subject_id, c.description, c.objectives,
+        c.syllabus, c.cover_image, c.status, c.enrollment_start_time, c.enrollment_end_time,
+        c.enrollment_status, c.del_flag, c.create_time,
+        c.update_time, c.remark, s.subject_name,
+        (select GROUP_CONCAT(u.nickname)
+        from sys_user u
+        where u.user_id in (
+        select t.user_id
+        from edu_course_teacher ct
+        inner join edu_teacher t on ct.teacher_id = t.teacher_id
+        where ct.course_id = c.course_id
+        and ct.role = 'main'  <!-- 只获取主讲教师 -->
+        )
+        ) as teacher_name,
+        (select count(1)
+        from edu_course_student cs
+        where cs.course_id = c.course_id
+        ) as student_count
+        from edu_course c
+        left join edu_subject s on c.subject_id = s.subject_id
+        where c.course_id = #{courseId} and c.del_flag = 0
+    </select>
+
+    <select id="selectCoursesByTeacherId" parameterType="Long" resultMap="EduCourseResult">
+        select
+            c.course_id, c.course_name, c.course_code, c.subject_id, c.description,
+            c.objectives, c.syllabus, c.cover_image, c.status, c.enrollment_start_time,
+            c.enrollment_end_time, c.enrollment_status, c.del_flag,
+            c.create_time, c.update_time, c.remark, s.subject_name,
+            (select count(1)
+             from edu_course_student cs
+             where cs.course_id = c.course_id
+            ) as student_count
+        from edu_course c
+                 left join edu_subject s on c.subject_id = s.subject_id
+                 inner join edu_course_teacher ct on c.course_id = ct.course_id
+        where c.del_flag = 0 and ct.teacher_id = #{teacherId}
+        order by c.create_time desc
+    </select>
+
+    <!-- 逻辑删除课程 -->
+    <update id="logicDeleteCourse" parameterType="Long">
+        UPDATE edu_course
+        SET del_flag = 1, update_time = NOW()
+        WHERE course_id = #{courseId}
+    </update>
+
+    <!-- 查询学生最近学习的课程列表 -->
+    <select id="selectStudentRecentCourses" resultMap="CourseListResponseResult">
+        select
+        c.course_id, c.course_name, c.course_code, c.subject_id, c.description, c.objectives,
+        c.syllabus, c.cover_image, c.status, c.enrollment_start_time, c.enrollment_end_time,
+        c.enrollment_status, c.del_flag, c.create_time,
+        c.update_time, c.remark, s.subject_name,
+        (select GROUP_CONCAT(u.nickname)
+        from sys_user u
+        where u.user_id in (
+        select t.user_id
+        from edu_course_teacher ct
+        inner join edu_teacher t on ct.teacher_id = t.teacher_id
+        where ct.course_id = c.course_id
+        and ct.role = 'main'  <!-- 只获取主讲教师 -->
+        )
+        ) as teacher_name,
+        cs.progress,
+        (select count(1)
+        from edu_course_student cs_count
+        where cs_count.course_id = c.course_id
+        ) as student_count
+        from edu_course c
+        inner join edu_course_student cs on c.course_id = cs.course_id
+        left join edu_subject s on c.subject_id = s.subject_id
+        where c.del_flag = 0 and cs.student_id = #{studentId}
+        order by cs.last_learn_time desc, cs.join_time desc
+    </select>
+
+    <select id="selectResourceCount" parameterType="long">
+        SELECT COUNT(1) FROM edu_resource WHERE course_id = #{courseId}
+    </select>
+
+</mapper>

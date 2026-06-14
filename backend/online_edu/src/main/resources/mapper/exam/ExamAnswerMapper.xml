@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.mapper.ExamAnswerMapper">
+
+    <resultMap id="AnswerResultMap" type="com.exam.model.entity.ExamAnswer">
+        <id property="recordId" column="record_id"/>
+        <id property="questionId" column="question_id"/>
+        <result property="studentAnswer" column="student_answer"/>
+        <result property="score" column="score"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="questionContent" column="question_content"/>
+        <result property="correctAnswer" column="correct_answer"/>
+        <result property="points" column="points"/>
+        <result property="typeName" column="type_name"/>
+    </resultMap>
+
+    <insert id="batchInsert">
+        insert into exam_answer (record_id, question_id, student_answer, score, create_time)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.recordId}, #{item.questionId}, #{item.studentAnswer}, #{item.score}, now())
+        </foreach>
+    </insert>
+
+    <update id="batchUpdateScore">
+        update exam_answer
+        set score = CASE
+            <foreach collection="list" item="item">
+                WHEN record_id = #{item.recordId} AND question_id = #{item.questionId} THEN #{item.score}
+            </foreach>
+            ELSE score
+            END,
+            update_time = now()
+        where (record_id, question_id) in
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.recordId}, #{item.questionId})
+        </foreach>
+    </update>
+
+    <select id="selectAnswersByRecordId" resultMap="AnswerResultMap">
+        select a.record_id, a.question_id, a.student_answer,
+               a.score, a.create_time, a.update_time,
+               q.question_content, q.correct_answer, q.options,
+               t.type_name, t.is_auto_graded,
+               CASE 
+                 WHEN pq.exam_id IS NOT NULL THEN pq.points
+                 WHEN aq.assignment_id IS NOT NULL THEN aq.points
+                 ELSE 0
+               END as points
+        from exam_answer a
+        inner join exam_question_bank q on a.question_id = q.question_id
+        left join exam_question_type t on q.question_type_id = t.type_id
+        left join exam_record r on a.record_id = r.record_id
+        left join exam_paper_question pq on pq.exam_id = r.exam_id and pq.question_id = a.question_id
+        left join exam_assignment_question aq on aq.assignment_id = r.exam_id and aq.question_id = a.question_id
+        where a.record_id = #{recordId}
+        order by
+        CASE 
+          WHEN pq.exam_id IS NOT NULL THEN pq.question_order
+          WHEN aq.assignment_id IS NOT NULL THEN aq.question_order
+          ELSE 0
+        END
+    </select>
+
+</mapper> 

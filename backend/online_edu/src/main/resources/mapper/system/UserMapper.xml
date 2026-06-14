@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.user.mapper.UserMapper">
+    
+    <!-- 根据用户名查询用户信息，包含角色信息 -->
+    <select id="selectUserWithRoles" resultMap="UserWithRolesResult">
+        SELECT u.*, r.role_id, r.role_name, r.role_key, m.menu_id, m.menu_name, m.perms
+        FROM sys_user u
+        LEFT JOIN sys_user_role ur ON u.user_id = ur.user_id
+        LEFT JOIN sys_role r ON ur.role_id = r.role_id
+        LEFT JOIN sys_role_menu rm ON r.role_id = rm.role_id
+        LEFT JOIN sys_menu m ON rm.menu_id = m.menu_id
+        WHERE u.username = #{username} AND u.del_flag = 0
+    </select>
+    
+    <!-- 用户信息结果映射，包含角色和菜单权限 -->
+    <resultMap id="UserWithRolesResult" type="com.user.model.entity.SysUser">
+        <id property="userId" column="user_id"/>
+        <result property="username" column="username"/>
+        <result property="password" column="password"/>
+        <result property="nickname" column="nickname"/>
+        <result property="email" column="email"/>
+        <result property="phone" column="phone"/>
+        <result property="sex" column="sex"/>
+        <result property="avatar" column="avatar"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+        <collection property="roles" ofType="com.user.model.entity.SysRole">
+            <id property="roleId" column="role_id"/>
+            <result property="roleName" column="role_name"/>
+            <result property="roleKey" column="role_key"/>
+            <collection property="menus" ofType="com.user.model.entity.SysMenu">
+                <id property="menuId" column="menu_id"/>
+                <result property="menuName" column="menu_name"/>
+                <result property="perms" column="perms"/>
+            </collection>
+        </collection>
+    </resultMap>
+    
+    <!-- 删除用户角色关联 -->
+    <delete id="deleteUserRoles">
+        DELETE FROM sys_user_role WHERE user_id = #{userId}
+    </delete>
+    
+    <!-- 批量插入用户角色关联 -->
+    <insert id="insertUserRoles">
+        INSERT INTO sys_user_role(user_id, role_id) VALUES
+        <foreach collection="roleIds" item="roleId" separator=",">
+            (#{userId}, #{roleId})
+        </foreach>
+    </insert>
+</mapper> 

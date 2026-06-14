@@ -1,0 +1,65 @@
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:your_api_key_here}
+      base-url: https://api.deepseek.com
+      chat:
+        options:
+          model: deepseek-chat
+          temperature: 0.7
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+  profiles:
+    active: dev
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  main:
+    allow-circular-references: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.user.entity,com.course.model.entity,com.exam.model.entity
+
+# JWT配置
+jwt:
+  # 密钥
+  secret: ${JWT_SECRET:your_jwt_secret_here}
+  # 令牌过期时间（秒），默认24小时
+  expiration: 86400
+  # 刷新令牌过期时间（秒），默认7天
+  refresh-expiration: 604800
+
+# 日志配置
+logging:
+  level:
+    com.user: DEBUG
+    com.course: DEBUG
+    com.exam: DEBUG
+    org.springframework.security: DEBUG
+
+# GeoIP2数据库路径（本地文件路径或classpath路径）
+geoip:
+  database:
+    path: classpath:geolite2/GeoLite2-City.mmdb
+
+
+minio:
+  url: ${MINIO_URL:http://localhost:9000}
+  accessKey: ${MINIO_ACCESS_KEY:your_access_key}
+  secretKey: ${MINIO_SECRET_KEY:your_secret_key}
+  bucketName: file  # 存储桶名称

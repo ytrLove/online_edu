@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.mapper.ExamAssignmentMapper">
+
+    <resultMap id="AssignmentResultMap" type="com.exam.model.entity.ExamAssignment">
+        <id property="assignmentId" column="assignment_id"/>
+        <result property="courseId" column="course_id"/>
+        <result property="title" column="title"/>
+        <result property="description" column="description"/>
+        <result property="startTime" column="start_time"/>
+        <result property="dueTime" column="due_time"/>
+        <result property="totalPoints" column="total_points"/>
+        <result property="status" column="status"/>
+        <result property="teacherId" column="teacher_id"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="courseName" column="course_name"/>
+        <result property="teacherName" column="teacher_name"/>
+    </resultMap>
+
+    <sql id="selectAssignmentVo">
+        select a.assignment_id, a.course_id, a.title, a.description,a.start_time, a.due_time,
+               a.total_points, a.status, a.teacher_id, a.del_flag,
+               a.create_time, a.update_time,
+               c.course_name, u.username as teacher_name
+        from exam_assignment a
+        left join edu_course c on a.course_id = c.course_id
+        left join edu_teacher t on a.teacher_id = t.teacher_id
+        left join sys_user u on t.user_id = u.user_id
+    </sql>
+
+    <select id="selectAssignmentPage" resultMap="AssignmentResultMap">
+        <include refid="selectAssignmentVo"/>
+        <where>
+            a.del_flag = 0
+            <if test="assignment != null">
+                <if test="assignment.courseId != null">
+                    AND a.course_id = #{assignment.courseId}
+                </if>
+                <if test="assignment.teacherId != null">
+                    AND a.teacher_id = #{assignment.teacherId}
+                </if>
+                <if test="assignment.status != null">
+                    AND a.status = #{assignment.status}
+                </if>
+                <if test="assignment.title != null and assignment.title != ''">
+                    AND a.title LIKE CONCAT('%', #{assignment.title}, '%')
+                </if>
+            </if>
+        </where>
+        ORDER BY a.create_time DESC
+    </select>
+
+    <select id="selectAssignmentById" resultMap="AssignmentResultMap">
+        <include refid="selectAssignmentVo"/>
+        where a.assignment_id = #{assignmentId} and a.del_flag = 0
+    </select>
+
+    <select id="selectStudentAssignmentPage" resultMap="AssignmentResultMap">
+        <include refid="selectAssignmentVo"/>
+        INNER JOIN edu_course_student cs ON a.course_id = cs.course_id
+        <where>
+            a.del_flag = 0 AND cs.student_id = #{studentId}
+            <if test="assignment != null">
+                <if test="assignment.courseId != null">
+                    AND a.course_id = #{assignment.courseId}
+                </if>
+                <if test="assignment.status != null">
+                    AND a.status = #{assignment.status}
+                </if>
+                <if test="assignment.title != null and assignment.title != ''">
+                    AND a.title LIKE CONCAT('%', #{assignment.title}, '%')
+                </if>
+            </if>
+        </where>
+        ORDER BY a.create_time DESC
+    </select>
+
+</mapper> 

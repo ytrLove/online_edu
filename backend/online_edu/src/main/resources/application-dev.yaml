@@ -1,0 +1,9 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/new_online_edu?useSSL=false&serverTimezone=UTC
+    username: ${MYSQL_DEV_USERNAME:root}
+    password: ${MYSQL_DEV_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.stat.mapper.LearningBehaviorMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.stat.model.entity.LearningBehavior">
+        <id column="behavior_id" property="behaviorId"/>
+        <result column="student_id" property="studentId"/>
+        <result column="student_name" property="studentName"/>
+        <result column="course_id" property="courseId"/>
+        <result column="course_name" property="courseName"/>
+        <result column="behavior_type" property="behaviorType"/>
+        <result column="resource_id" property="resourceId"/>
+        <result column="description" property="description"/>
+        <result column="duration" property="duration"/>
+        <result column="completion_rate" property="completionRate"/>
+        <result column="ip_address" property="ipAddress"/>
+        <result column="behavior_time" property="behaviorTime"/>
+        <result column="client_info" property="clientInfo"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 分页查询学习行为记录 -->
+    <select id="selectBehaviorPage" resultMap="BaseResultMap">
+        SELECT b.*,
+               u.nickname as student_name,
+               c.course_name,
+               CASE 
+                   WHEN b.behavior_type = 'VIDEO_WATCH' THEN '观看视频'
+                   WHEN b.behavior_type = 'RESOURCE_DOWNLOAD' THEN '资源下载'
+                   WHEN b.behavior_type = 'ASSIGNMENT_SUBMIT' THEN '提交作业'
+                   WHEN b.behavior_type = 'FORUM_PARTICIPATE' THEN '论坛参与'
+                   WHEN b.behavior_type = 'QUIZ_COMPLETE' THEN '完成测验'
+                   ELSE b.behavior_type
+               END as description
+        FROM stat_learning_behavior b
+        LEFT JOIN edu_student s ON b.student_id = s.student_id
+        LEFT JOIN sys_user u ON s.user_id = u.user_id
+        LEFT JOIN edu_course c ON b.course_id = c.course_id
+        WHERE 1=1
+        <if test="studentId != null">
+            AND b.student_id = #{studentId}
+        </if>
+        <if test="courseId != null">
+            AND b.course_id = #{courseId}
+        </if>
+        <if test="behaviorType != null and behaviorType != ''">
+            AND b.behavior_type = #{behaviorType}
+        </if>
+        <if test="startTime != null">
+            AND b.behavior_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND b.behavior_time &lt;= #{endTime}
+        </if>
+        ORDER BY b.behavior_time DESC
+    </select>
+
+    <!-- 统计指定时间段内的行为次数 -->
+    <select id="countBehavior" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM stat_learning_behavior
+        WHERE 1=1
+        <if test="studentId != null">
+            AND student_id = #{studentId}
+        </if>
+        <if test="courseId != null">
+            AND course_id = #{courseId}
+        </if>
+        <if test="behaviorType != null and behaviorType != ''">
+            AND behavior_type = #{behaviorType}
+        </if>
+        <if test="startTime != null">
+            AND behavior_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND behavior_time &lt;= #{endTime}
+        </if>
+    </select>
+
+    <!-- 统计指定时间段内的总学习时长（分钟） -->
+    <select id="sumStudyDuration" resultType="java.lang.Integer">
+        SELECT COALESCE(SUM(duration), 0) / 60
+        FROM stat_learning_behavior
+        WHERE behavior_type = 'view_resource'
+        <if test="studentId != null">
+            AND student_id = #{studentId}
+        </if>
+        <if test="courseId != null">
+            AND course_id = #{courseId}
+        </if>
+        <if test="startTime != null">
+            AND behavior_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND behavior_time &lt;= #{endTime}
+        </if>
+    </select>
+
+</mapper> 

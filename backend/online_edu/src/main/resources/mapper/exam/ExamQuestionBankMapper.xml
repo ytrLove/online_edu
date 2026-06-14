@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.mapper.ExamQuestionBankMapper">
+
+    <resultMap id="QuestionResultMap" type="com.exam.model.entity.ExamQuestionBank">
+        <id property="questionId" column="question_id"/>
+        <result property="questionTypeId" column="question_type_id"/>
+        <result property="questionContent" column="question_content"/>
+        <result property="options" column="options"/>
+        <result property="correctAnswer" column="correct_answer"/>
+        <result property="explanation" column="explanation"/>
+        <result property="difficulty" column="difficulty"/>
+        <result property="courseId" column="course_id"/>
+        <result property="teacherId" column="teacher_id"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="typeName" column="type_name"/>
+        <result property="courseName" column="course_name"/>
+        <result property="teacherName" column="teacher_name"/>
+    </resultMap>
+
+    <sql id="selectQuestionVo">
+        select q.question_id, q.question_type_id, q.question_content, q.options, q.correct_answer,
+               q.explanation, q.difficulty, q.course_id, q.teacher_id, q.status, q.del_flag,
+               q.create_time, q.update_time,
+               t.type_name, c.course_name, u.username
+        from exam_question_bank q
+        left join exam_question_type t on q.question_type_id = t.type_id
+        left join edu_course c on q.course_id = c.course_id
+        left join edu_teacher e on q.teacher_id = e.teacher_id
+        left join sys_user u  on  e.user_id = u.user_id
+    </sql>
+
+    <select id="selectQuestionPage" resultMap="QuestionResultMap">
+        <include refid="selectQuestionVo"/>
+        <where>
+            q.del_flag = 0
+            <if test="question != null">
+                <if test="question.questionTypeId != null">
+                    AND q.question_type_id = #{question.questionTypeId}
+                </if>
+                <if test="question.courseId != null">
+                    AND q.course_id = #{question.courseId}
+                </if>
+                <if test="question.teacherId != null">
+                    AND q.teacher_id = #{question.teacherId}
+                </if>
+                <if test="question.difficulty != null and question.difficulty != ''">
+                    AND q.difficulty = #{question.difficulty}
+                </if>
+                <if test="question.status != null">
+                    AND q.status = #{question.status}
+                </if>
+                <if test="question.questionContent != null and question.questionContent != ''">
+                    AND q.question_content LIKE CONCAT('%', #{question.questionContent}, '%')
+                </if>
+            </if>
+        </where>
+        ORDER BY q.create_time DESC
+    </select>
+
+    <select id="selectQuestionById" resultMap="QuestionResultMap">
+        <include refid="selectQuestionVo"/>
+        where q.question_id = #{questionId} and q.del_flag = 0
+    </select>
+
+    <select id="selectQuestionByIds" resultMap="QuestionResultMap">
+        <include refid="selectQuestionVo"/>
+        where q.question_id IN
+        <foreach collection="questionIds" item="questionId" open="(" separator="," close=")">
+            #{questionId}
+        </foreach>
+        and q.del_flag = 0
+    </select>
+
+</mapper> 

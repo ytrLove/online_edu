@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.exam.mapper.ExamPaperMapper">
+
+    <!-- 试卷实体结果映射，定义试卷各字段与数据库列的对应关系 -->
+    <resultMap id="ExamResultMap" type="com.exam.model.entity.ExamPaper">
+        <!-- 主键映射 -->
+        <id property="examId" column="exam_id"/>
+        <!-- 基本属性映射 -->
+        <result property="courseId" column="course_id"/>
+        <result property="title" column="title"/>
+        <result property="description" column="description"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="duration" column="duration"/>
+        <result property="totalPoints" column="total_points"/>
+        <result property="status" column="status"/>
+        <result property="teacherId" column="teacher_id"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <!-- 关联字段映射 -->
+        <result property="courseName" column="course_name"/>
+        <result property="teacherName" column="teacher_name"/>
+        <!-- 一对多关联：试卷与题目的关系 -->
+        <collection property="questions" column="exam_id" select="selectQuestionsByExamId" />
+    </resultMap>
+
+    <!-- 查询试卷基本信息的共用SQL片段 -->
+    <sql id="selectExamVo">
+        select e.exam_id, e.course_id, e.title, e.description, e.start_time, e.end_time,
+               e.duration, e.total_points, e.status, e.teacher_id, e.del_flag,
+               e.create_time, e.update_time,
+               c.course_name, u.username as teacher_name
+        from exam_paper e
+        left join edu_course c on e.course_id = c.course_id
+        left join edu_teacher t on e.teacher_id = t.teacher_id
+        left join sys_user u on t.user_id = u.user_id
+    </sql>
+
+    <!-- 分页查询试卷列表 -->
+    <select id="selectExamPage" resultMap="ExamResultMap">
+        <include refid="selectExamVo"/>
+        <where>
+            e.del_flag = 0
+            <if test="exam != null">
+                <!-- 根据课程ID筛选 -->
+                <if test="exam.courseId != null">
+                    AND e.course_id = #{exam.courseId}
+                </if>
+                <!-- 根据教师ID筛选 -->
+                <if test="exam.teacherId != null">
+                    AND e.teacher_id = #{exam.teacherId}
+                </if>
+                <!-- 根据状态筛选 -->
+                <if test="exam.status != null">
+                    AND e.status = #{exam.status}
+                </if>
+                <!-- 根据标题模糊查询 -->
+                <if test="exam.title != null and exam.title != ''">
+                    AND e.title LIKE CONCAT('%', #{exam.title}, '%')
+                </if>
+            </if>
+        </where>
+        ORDER BY e.create_time DESC
+    </select>
+
+    <!-- 根据ID查询试卷详情 -->
+    <select id="selectExamById" resultMap="ExamResultMap">
+        <include refid="selectExamVo"/>
+        where e.exam_id = #{examId} and e.del_flag = 0
+    </select>
+
+    <!-- 学生视角查询试卷列表（只能查询已选课程的试卷） -->
+    <select id="selectStudentExamPage" resultMap="ExamResultMap">
+        <include refid="selectExamVo"/>
+        INNER JOIN edu_course_student cs ON e.course_id = cs.course_id
+        <where>
+            e.del_flag = 0 AND cs.student_id = #{studentId}
+            <if test="exam != null">
+                <!-- 根据课程ID筛选 -->
+                <if test="exam.courseId != null">
+                    AND e.course_id = #{exam.courseId}
+                </if>
+                <!-- 根据状态筛选 -->
+                <if test="exam.status != null">
+                    AND e.status = #{exam.status}
+                </if>
+                <!-- 根据标题模糊查询 -->
+                <if test="exam.title != null and exam.title != ''">
+                    AND e.title LIKE CONCAT('%', #{exam.title}, '%')
+                </if>
+            </if>
+        </where>
+        ORDER BY e.create_time DESC
+    </select>
+    
+    <!-- 根据试卷ID查询对应的题目列表 -->
+    <select id="selectQuestionsByExamId" resultType="com.exam.model.entity.ExamQuestionBank">
+        <!-- 查询试卷下的所有题目及其详细信息 -->
+        SELECT 
+            q.question_id,                           <!-- 题目ID -->
+            q.question_type_id,                      <!-- 题目类型ID -->
+            t.type_name,                             <!-- 题目类型名称 -->
+            q.difficulty,                            <!-- 题目难度 -->
+            q.question_content,                      <!-- 题目内容 -->
+            CONCAT(SUBSTRING(q.question_content, 1, 30), '...') AS question_name, <!-- 题目名称(取内容前30字符) -->
+            q.options,                               <!-- 选项内容 -->
+            q.correct_answer,                        <!-- 正确答案 -->
+            q.explanation,                           <!-- 解析说明 -->
+            q.status,                                <!-- 状态 -->
+            pq.question_order                        <!-- 题目排序 -->
+        FROM exam_paper_question pq
+        JOIN exam_question_bank q ON pq.question_id = q.question_id
+        JOIN exam_question_type t ON q.question_type_id = t.type_id
+        WHERE pq.exam_id = #{examId} AND q.del_flag = 0    <!-- 筛选条件：试卷ID和有效标记 -->
+        ORDER BY pq.question_order ASC                     <!-- 按题目顺序排序 -->
+    </select>
+
+</mapper> 

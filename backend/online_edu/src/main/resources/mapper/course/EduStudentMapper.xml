@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.course.mapper.EduStudentMapper">
+
+    <resultMap type="com.course.model.entity.EduStudent" id="EduStudentResult">
+        <id property="studentId" column="student_id"/>
+        <result property="studentCode" column="student_code"/>
+        <result property="major" column="major"/>
+        <result property="className" column="class_name"/>
+        <result property="studentStatus" column="student_status"/>
+        <result property="admissionDate" column="admission_date"/>
+        <result property="graduationDate" column="graduation_date"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <!-- 关联用户信息 -->
+        <result property="nickname" column="nickname"/>
+        <result property="avatar" column="avatar"/>
+        <result property="username" column="username"/>
+        <result property="email" column="email"/>
+        <result property="phone" column="phone"/>
+    </resultMap>
+    
+    <select id="selectStudentsWithUserInfo" resultMap="EduStudentResult">
+        select s.*, u.nickname, u.avatar, u.username, u.email, u.phone
+        from edu_student s
+        left join sys_user u on s.user_id = u.user_id
+        order by s.create_time desc
+    </select>
+    
+    <select id="selectStudentWithUserInfoById" parameterType="Long" resultMap="EduStudentResult">
+        select s.*, u.nickname, u.avatar, u.username, u.email, u.phone
+        from edu_student s
+        left join sys_user u on s.user_id = u.user_id
+        where s.student_id = #{studentId}
+    </select>
+</mapper>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.course.mapper.EduCourseStudentMapper">
+
+    <resultMap type="com.course.model.entity.EduCourseStudent" id="EduCourseStudentResult">
+        <id property="id" column="id"/>
+        <result property="courseId" column="course_id"/>
+        <result property="studentId" column="student_id"/>
+        <result property="enrollDate" column="enrollment_date"/>
+        <result property="grade" column="grade"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+    
+    <resultMap type="com.course.model.entity.EduCourse" id="EduCourseResult">
+        <id property="courseId" column="course_id"/>
+        <result property="courseName" column="course_name"/>
+        <result property="courseCode" column="course_code"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="description" column="description"/>
+        <result property="objectives" column="objectives"/>
+        <result property="syllabus" column="syllabus"/>
+        <result property="coverImage" column="cover_image"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+        <result property="subjectName" column="subject_name"/>
+    </resultMap>
+    
+    <select id="selectStudentsByCourseId" resultMap="EduCourseStudentResult">
+        select cs.*, s.nickname, s.student_no
+        from edu_course_student cs
+        left join edu_student s on cs.student_id = s.student_id
+        where cs.course_id = #{courseId}
+    </select>
+    
+    <select id="selectCoursesByStudentId" resultMap="EduCourseStudentResult">
+        select cs.*, c.course_name, c.course_code
+        from edu_course_student cs
+        left join edu_course c on cs.course_id = c.course_id
+        where cs.student_id = #{studentId}
+    </select>
+    
+    <select id="selectByCourseIdAndStudentId" resultMap="EduCourseStudentResult">
+        select * from edu_course_student
+        where course_id = #{courseId} and student_id = #{studentId}
+    </select>
+    
+    <select id="selectCourseListByStudentId" resultMap="EduCourseResult">
+        select c.course_id, c.course_name, c.course_code, c.subject_id, c.description, 
+               c.objectives, c.syllabus, c.cover_image, c.status, c.del_flag,
+               c.create_time, c.update_time, c.remark, s.subject_name
+        from edu_course c
+        join edu_course_student cs on c.course_id = cs.course_id
+        left join edu_subject s on c.subject_id = s.subject_id
+        where c.del_flag = 0 and cs.student_id = #{studentId}
+        order by c.create_time desc
+    </select>
+    
+    <select id="selectStudentDetailsByCourseId" resultType="java.util.Map">
+        select 
+            s.student_id, 
+            u.nickname, 
+            u.avatar,
+            u.username,
+            u.email,
+            u.phone,
+            s.student_no,
+            s.major, 
+            s.class_name, 
+            s.student_status,
+            s.grade,
+            s.admission_date,
+            s.graduation_date,
+            cs.enrollment_date,
+            cs.completion_status,
+            cs.final_grade,
+            s.create_time,
+            s.update_time
+        from edu_course_student cs
+        join edu_student s on cs.student_id = s.student_id
+        left join sys_user u on s.student_id = u.user_id
+        where cs.course_id = #{courseId}
+        order by cs.enrollment_date desc
+    </select>
+</mapper> 
