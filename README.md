@@ -48,11 +48,20 @@
 ├── frontend/
 │   ├── admin/                   # 教师端管理后台
 │   └── user/                    # 学生端前台
+│
+├── nginx/                       # Nginx 配置
+│   ├── admin.conf               # 管理后台配置
+│   └── user.conf                # 学生端配置
+│
+├── docker-compose.yml           # Docker 编排文件
+└── .env.example                 # 环境变量模板
 ```
 
 ## 快速开始
 
-### 环境要求
+### 方式一：本地开发环境
+
+#### 环境要求
 
 - JDK 17+
 - Node.js 18+
@@ -60,7 +69,7 @@
 - Redis 6.0+
 - Maven 3.8+
 
-### 1. 配置环境变量
+#### 1. 配置环境变量
 
 复制 `.env.example` 为 `.env` 并填入实际配置：
 
@@ -87,7 +96,7 @@ MYSQL_USERNAME=your_mysql_username
 MYSQL_PASSWORD=your_mysql_password
 ```
 
-### 2. 启动后端
+#### 2. 启动后端
 
 ```bash
 cd backend/online_edu
@@ -101,7 +110,7 @@ mvn spring-boot:run
 
 后端服务将在 `http://localhost:8080` 启动。
 
-### 3. 启动前端
+#### 3. 启动前端
 
 **教师端管理后台：**
 
@@ -119,11 +128,127 @@ pnpm install
 pnpm dev
 ```
 
-### 4. Docker 部署（可选）
+---
+
+### 方式二：Docker 一键部署（推荐）
+
+#### 前置要求
+
+- Docker 20.10+
+- Docker Compose 2.0+
+
+#### 1. 配置环境变量
 
 ```bash
-cd backend/online_edu
+cp .env.example .env
+```
+
+编辑 `.env` 文件配置数据库密码、JWT 密钥等：
+
+```env
+MYSQL_ROOT_PASSWORD=root
+MYSQL_USERNAME=edu_user
+MYSQL_PASSWORD=edu_password
+JWT_SECRET=your_jwt_secret_here
+OPENAI_API_KEY=your_api_key_here
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+```
+
+#### 2. 构建前端
+
+```bash
+# 构建管理后台
+cd frontend/admin
+pnpm install
+pnpm build
+
+# 构建学生端
+cd ../user
+pnpm install
+pnpm build
+```
+
+#### 3. 启动所有服务
+
+```bash
+# 在项目根目录执行
 docker-compose up -d
+```
+
+首次启动会自动：
+- 拉取 MySQL、Redis、MinIO、Nginx 镜像
+- 构建后端应用镜像
+- 初始化数据库（执行 `database_scripts/14_full_db_init.sql`）
+- 创建数据卷持久化存储
+
+#### 4. 查看服务状态
+
+```bash
+docker-compose ps
+```
+
+#### 5. 访问服务
+
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| 教师端管理后台 | http://localhost:8081 | 管理课程、考试、用户 |
+| 学生端前台 | http://localhost:8082 | 学生学习入口 |
+| 后端 API | http://localhost:8080/api | 接口服务 |
+| MinIO 控制台 | http://localhost:9001 | 文件存储管理 |
+| MySQL | localhost:3306 | 数据库 |
+| Redis | localhost:6379 | 缓存服务 |
+
+#### 6. 常用命令
+
+```bash
+# 停止所有服务
+docker-compose down
+
+# 停止并删除数据卷
+docker-compose down -v
+
+# 查看日志
+docker-compose logs -f backend
+
+# 重启某个服务
+docker-compose restart backend
+
+# 重新构建并启动
+docker-compose up -d --build
+```
+
+### Docker 服务架构
+
+```
+                    ┌─────────────────┐
+                    │   Nginx Proxy   │
+                    │  (Port 8081/8082)│
+                    └────────┬────────┘
+                             │
+         ┌───────────────────┴───────────────────┐
+         │                                       │
+         ▼                                       ▼
+┌─────────────────┐                   ┌─────────────────┐
+│   Admin 前端    │                   │    User 前端    │
+│  (静态文件)     │                   │   (静态文件)    │
+└─────────────────┘                   └─────────────────┘
+         │                                       │
+         └───────────────────┬───────────────────┘
+                             │ API Request
+                             ▼
+                    ┌─────────────────┐
+                    │  Backend API    │
+                    │  (Port 8080)    │
+                    └────────┬────────┘
+                             │
+         ┌───────────────────┼───────────────────┐
+         │                   │                   │
+         ▼                   ▼                   ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│      MySQL      │ │      Redis      │ │      MinIO      │
+│   (Port 3306)   │ │   (Port 6379)   │ │   (Port 9000)   │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
 ```
 
 ## API 文档
